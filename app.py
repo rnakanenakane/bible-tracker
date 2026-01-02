@@ -84,7 +84,6 @@ except Exception as e:
 
 # --- 3. FUNÇÕES AUXILIARES ---
 def expandir_capitulos(str_caps):
-    """Converte '1-3' em [1, 2, 3] ou '1' em [1]"""
     str_caps = str(str_caps).strip()
     if "-" in str_caps:
         try:
@@ -100,31 +99,21 @@ def expandir_capitulos(str_caps):
 
 
 def encontrar_proxima_data_nao_lida(df_plano, df_lidos):
-    """
-    Percorre o plano cronologicamente e retorna a data do primeiro
-    bloco de capítulos que ainda não foi totalmente lido.
-    """
     if df_plano.empty:
         return datetime.now(FUSO_BR)
 
-    # Se o usuário nunca leu nada, retorna a primeira data do plano
     if df_lidos.empty:
         return df_plano["data"].min()
 
-    # Cria um conjunto rápido para verificação: {"(Gênesis, 1)", "(Gênesis, 2)"...}
-    # (Livro, Capitulo)
     lidos_set = set(zip(df_lidos["Livro"], df_lidos["Capitulo"]))
     df_plano_ordenado = df_plano.sort_values(by="data")
 
     for _, row in df_plano_ordenado.iterrows():
         livro_plano = row["livro"]
-        # Expande '1-3' para [1, 2, 3]
         lista_caps = expandir_capitulos(row["capitulos"])
 
-        # Verifica capítulo por capítulo desse dia
         todas_lidas_hoje = True
         for cap in lista_caps:
-            # Se encontrar UM capítulo que não está na lista de lidos:
             if (livro_plano, cap) not in lidos_set:
                 todas_lidas_hoje = False
                 break
@@ -132,27 +121,48 @@ def encontrar_proxima_data_nao_lida(df_plano, df_lidos):
         if not todas_lidas_hoje:
             return row["data"]
 
-    # Se leu tudo, retorna hoje
     return datetime.now(FUSO_BR)
+
+
+def buscar_ultimo_plano_ativo(usuario):
+    try:
+        response = (
+            supabase.table("leituras")
+            .select("plano")
+            .eq("usuario", usuario)
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+
+        if response.data and len(response.data) > 0:
+            return response.data[0]["plano"]
+    except Exception:
+        pass
+    return None
 
 
 @st.cache_data(ttl=300)
 def carregar_planos():
     try:
         response = supabase.table("planos").select("*").execute()
+
         df_completo = pd.DataFrame(response.data)
 
         if df_completo.empty:
             st.warning("Nenhum plano encontrado no banco de dados.")
             return {}
 
+        # Ajusta formatos
         df_completo["data"] = pd.to_datetime(df_completo["data"])
 
+        # Cria um dicionário separado por nome do plano
         todos_planos = {}
         nomes_planos = df_completo["nome_plano"].unique()
 
         for nome in nomes_planos:
             df_filtrado = df_completo[df_completo["nome_plano"] == nome].copy()
+            # Ordena por data
             df_filtrado = df_filtrado.sort_values(by="data")
 
             # Pré-cálculo de quantidade de capítulos (para a meta)
@@ -171,7 +181,7 @@ def carregar_lista_usuarios():
     try:
         response = supabase.table("usuarios").select("nome").execute()
         lista = [item["nome"] for item in response.data]
-        return sorted(lista) 
+        return sorted(lista)
     except Exception as e:
         st.error(f"Erro ao conectar Supabase (Usuários): {e}")
         return ["Erro"]
@@ -205,7 +215,6 @@ def salvar_nova_leitura(usuario, plano, livro, capitulo):
             "plano": plano,
             "livro": livro,
             "capitulo": capitulo,
-            # created_at é automático no banco
         }
         supabase.table("leituras").insert(dados).execute()
     except Exception as e:
@@ -308,15 +317,23 @@ if pagina == "Minha Leitura":
         if not lista_usuarios:
             st.error("Nenhum usuário encontrado.")
             st.stop()
+
         usuario = st.selectbox("👤 Quem é você?", lista_usuarios)
+
+        if usuario != st.session_state.get("user_check_plano"):
+            ultimo_plano = buscar_ultimo_plano_ativo(usuario)
+            if ultimo_plano and ultimo_plano in dict_planos:
+                st.session_state["plano_selecionado_widget"] = ultimo_plano
+            st.session_state["user_check_plano"] = usuario
 
     if not dict_planos:
         st.warning("Carregando planos...")
         st.stop()
 
     with col_plano:
+        lista_planos_keys = sorted(list(dict_planos.keys()))
         plano_nome = st.selectbox(
-            "📅 Escolha o Plano", sorted(list(dict_planos.keys()))
+            "📅 Escolha o Plano", lista_planos_keys, key="plano_selecionado_widget"
         )
 
     df_plano = dict_planos[plano_nome]
@@ -326,6 +343,7 @@ if pagina == "Minha Leitura":
 
     if mudou_usuario or mudou_plano:
         df_historico = carregar_leituras_usuario(usuario, plano_nome)
+
         proxima_data = encontrar_proxima_data_nao_lida(df_plano, df_historico)
 
         try:
@@ -334,7 +352,7 @@ if pagina == "Minha Leitura":
 
             if pd.to_datetime(proxima_data).date() != datetime.now(FUSO_BR).date():
                 st.toast(f"Indo para próxima leitura pendente: {msg_data}", icon="📖")
-            elif mudou_usuario:  # Se for hoje e mudou usuário, confirma que está em dia
+            elif mudou_usuario:
                 st.toast(f"Tudo em dia! Mostrando hoje: {msg_data}", icon="✅")
 
         except Exception as e:
