@@ -5,7 +5,6 @@ from datetime import datetime
 from supabase import create_client, Client
 import pytz
 
-# --- 1. CONFIGURAÇÃO DA PÁGINA E CSS ---
 st.set_page_config(
     page_title="Rondoninha Church | Leitura",
     page_icon="✝️",
@@ -78,8 +77,6 @@ except Exception as e:
     st.error("Erro ao configurar Supabase. Verifique o secrets.toml")
     st.stop()
 
-# --- 3. FUNÇÕES AUXILIARES ---
-
 def expandir_capitulos(str_caps):
     """Converte '1-3' em [1, 2, 3] ou '1' em [1]"""
     str_caps = str(str_caps).strip()
@@ -95,6 +92,7 @@ def expandir_capitulos(str_caps):
 @st.cache_data(ttl=300) # Cache de 5 min para não ficar batendo no banco toda hora
 def carregar_planos():
     try:
+        # Busca todos os registros da tabela 'planos' no Supabase
         response = supabase.table("planos").select("*").execute()
         df_completo = pd.DataFrame(response.data)
         
@@ -128,7 +126,7 @@ def carregar_lista_usuarios():
         # Busca na tabela 'usuarios'
         response = supabase.table("usuarios").select("nome").execute()
         lista = [item['nome'] for item in response.data]
-        return sorted(lista) # Retorna ordenado alfabeticamente
+        return sorted(lista)
     except Exception as e:
         st.error(f"Erro ao conectar Supabase (Usuários): {e}")
         return ["Erro"]
@@ -167,7 +165,6 @@ def salvar_nova_leitura(usuario, plano, livro, capitulo):
 
 def calcular_metricas(dict_planos):
     try:
-        # Traz todas as leituras para o dashboard
         response = supabase.table("leituras").select("*").execute()
         df_registros = pd.DataFrame(response.data)
         
@@ -181,9 +178,7 @@ def calcular_metricas(dict_planos):
     qtd_em_dia = 0
     qtd_atrasados = 0
     
-    # Data de hoje no Brasil para calcular a meta correta
     hoje = datetime.now(FUSO_BR)
-    # Remove a info de hora para comparar apenas data com data
     hoje_date = hoje.date()
     
     grupos = df_registros.groupby(["Usuario", "Plano"])
@@ -232,7 +227,7 @@ if 'data_selecionada' not in st.session_state:
 if 'usuario_anterior' not in st.session_state: 
     st.session_state['usuario_anterior'] = None
 
-
+# Sidebar
 with st.sidebar:
     st.markdown("### ⛪ Menu")
     pagina = st.radio("Navegar", ["Minha Leitura", "Progresso Geral"], label_visibility="collapsed")
@@ -247,7 +242,6 @@ if pagina == "Minha Leitura":
         if not lista_usuarios:
             st.error("Nenhum usuário encontrado.")
             st.stop()
-        # Lista de usuários já vem ordenada da função
         usuario = st.selectbox("👤 Quem é você?", lista_usuarios)
     
     if not dict_planos:
@@ -255,12 +249,10 @@ if pagina == "Minha Leitura":
         st.stop()
         
     with col_plano:
-        # Ordena alfabeticamente os planos
         plano_nome = st.selectbox("📅 Escolha o Plano", sorted(list(dict_planos.keys())))
     
     df_plano = dict_planos[plano_nome]
     
-    # Lógica inteligente: Recupera onde parou
     if usuario != st.session_state['usuario_anterior']:
         df_historico = carregar_leituras_usuario(usuario, plano_nome)
         if not df_historico.empty and 'Data' in df_historico.columns:
@@ -279,6 +271,7 @@ if pagina == "Minha Leitura":
         data_input = st.date_input("Data da Leitura", value=st.session_state['data_selecionada'])
         st.session_state['data_selecionada'] = pd.to_datetime(data_input)
     
+    # Filtra o plano para a data selecionada
     df_plano_valido = df_plano.dropna(subset=['data'])
     leitura_do_dia = df_plano_valido[df_plano_valido['data'].dt.date == st.session_state['data_selecionada'].date()]
     
@@ -301,7 +294,6 @@ if pagina == "Minha Leitura":
                     
                     ja_leu = False
                     if not df_lidos.empty:
-                         # Verifica se já leu este capítulo específico
                          check = df_lidos[
                              (df_lidos['Livro'] == livro) & 
                              (df_lidos['Capitulo'] == c)
@@ -310,7 +302,6 @@ if pagina == "Minha Leitura":
                     
                     label = f"{c} ✅" if ja_leu else f"{c}"
                     
-                    # Botão Interativo
                     if cols[i%10].button(
                         label, 
                         key=chave_botao, 
@@ -361,14 +352,13 @@ elif pagina == "Progresso Geral":
                     )
                     
                     altura = max(120, len(df_filtro) * 60)
-                    
                     st.altair_chart((barra + meta + texto).properties(height=altura), use_container_width=True)
                     st.divider()
                     
             with st.expander("📂 Ver Tabela Completa"):
                 st.dataframe(
                     df_dash[['Usuario', 'Plano', 'Lidos', 'Meta_Hoje', 'Status']], 
-                    use_container_width=True,
+                    width="stretch",
                     hide_index=True
                 )
         else: st.info("Nenhum dado para exibir.") 
