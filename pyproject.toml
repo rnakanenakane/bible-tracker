@@ -1,0 +1,35 @@
+[project]
+name = "bible-tracker"
+version = "0.1.0"
+description = "Um projeto para acompanhamento de leitura da Bíblia."
+requires-python = ">=3.11"
+dependencies = [
+    "streamlit~=1.52",
+    "pandas~=2.3",
+    "duckdb~=1.4",
+    "supabase~=2.27",
+    "altair~=6.0",
+    "types-pytz==2025.2.0.20251108",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black==25.12.0",
+    "flake8==7.3.0",
+    "isort==7.0.0",
+    "mypy==1.19.1",
+    "deptry==0.18.0", 
+    "bandit==1.7.9",  
+    "pip-audit==2.7.3",
+    "pip-tools==7.4.1", # Para gerar o requirements.txt,
+    "toml-to-requirements-0.3.0",
+]
+
+[tool.black]
+line-length = 105
+
+[tool.isort]
+profile = "black"
+
+[tool.mypy]
+ignore_missing_imports = true

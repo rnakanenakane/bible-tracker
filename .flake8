@@ -1,0 +1,5 @@
+[flake8]
+max-line-length = 105
+# E722: do not use bare 'except'
+# E203, W503: Ignorados para compatibilidade com o formatador `black`
+ignore = E722, E203, W503
