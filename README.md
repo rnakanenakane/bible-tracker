@@ -1,107 +1,112 @@
-# ✝️ Rondoninha Church | Leitura Bíblica
+# ✝️ Rondoninha Church: Acompanhamento de Leitura Bíblica
 
-Uma aplicação web interativa e simples para acompanhar o progresso da leitura bíblica da comunidade. Desenvolvida em **Python** com **Streamlit** e base de dados **Supabase**.
+![Streamlit](https://img.shields.io/badge/Feito%20com-Streamlit-red?style=for-the-badge&logo=streamlit)
+![Python](https://img.shields.io/badge/Python-3.9%2B-blue?style=for-the-badge&logo=python)
+![Supabase](https://img.shields.io/badge/Backend-Supabase-green?style=for-the-badge&logo=supabase)
 
-## 📋 Funcionalidades
+Uma aplicação web desenvolvida com Streamlit para acompanhar o progresso de leitura da Bíblia, tanto individualmente quanto em comunidade, com base em planos de leitura pré-definidos.
 
-* **Leitura Diária:** Seleciona o plano e marca os capítulos lidos no dia.
-* **Múltiplos Planos:** Suporte para planos Semestrais, Anuais, Cronológicos e Temáticos (Sabedoria).
-* **Gestão de Utilizadores:** Sistema simples para escolher o leitor a partir de uma lista na base de dados.
-* **Dashboard de Progresso:**
-    * Métricas gerais (Total de leitores, capítulos lidos, pessoas em dia/atrasadas).
-    * Gráficos visuais de progresso individual com linha de meta esperada.
-* **Design Responsivo:** Funciona bem em telemóveis e computadores.
+## ✨ Funcionalidades
+
+- **Acompanhamento Pessoal:** Marque capítulos como lidos e veja seu progresso diário.
+- **Seleção de Planos:** Escolha entre diferentes planos de leitura disponíveis no banco de dados.
+- **Navegação Inteligente:** O sistema direciona automaticamente para a próxima data com leitura pendente.
+- **Dashboard Comunitário:** Visualize o progresso de todos os participantes em um gráfico interativo, comparando o avanço de cada um com a meta do plano.
+- **Status de Leitura:** Identifique facilmente quem está "Em dia" ou "Atrasado" em relação ao cronograma.
+
+---
 
 ## 🛠️ Tecnologias Utilizadas
 
-* [Streamlit](https://streamlit.io/) - Framework para o Frontend e Backend.
-* [Supabase](https://supabase.com/) - Base de dados PostgreSQL na nuvem.
-* [Altair](https://altair-viz.github.io/) - Biblioteca para visualização de dados (Gráficos).
-* [Pandas](https://pandas.pydata.org/) - Manipulação e análise de dados.
+- **Frontend:** [Streamlit](https://streamlit.io/)
+- **Backend & Banco de Dados:** [Supabase](https://supabase.com/) (PostgreSQL)
+- **Linguagem:** Python 3.9+
+- **Ferramentas de Desenvolvimento:**
+  - `make` para automação de tarefas.
+  - `venv` para gerenciamento de ambiente virtual.
+  - `black`, `isort`, `flake8`, `mypy` para formatação e análise estática de código.
+  - `bandit`, `pip-audit` para verificação de segurança.
+  - `deptry` para análise de dependências.
 
-## 🚀 Como Correr Localmente
+---
 
-### Pré-requisitos
+## 🚀 Configuração e Execução
 
-* Python 3.8 ou superior instalado.
-* Uma conta no [Supabase](https://supabase.com/).
+Siga os passos abaixo para configurar e executar o projeto localmente.
 
-### Passo a Passo
+### 1. Pré-requisitos
 
-1.  **Clonar o repositório**
-    ```bash
-    git clone [https://github.com/teu-usuario/bible-tracker.git](https://github.com/teu-usuario/bible-tracker.git)
-    cd bible-tracker
-    ```
+- **Python 3.9 ou superior**
+- **Make** (geralmente já instalado em sistemas Linux/macOS; no Windows, pode ser usado via WSL ou Git Bash).
 
-2.  **Criar um ambiente virtual (Opcional, mas recomendado)**
-    ```bash
-    python -m venv .venv
-    # Windows:
-    .venv\Scripts\activate
-    # Linux/Mac:
-    source .venv/bin/activate
-    ```
+### 2. Clonar o Repositório
 
-3.  **Instalar as dependências**
-    ```bash
-    pip install -r requirements.txt
-    ```
+```bash
+git clone <URL_DO_SEU_REPOSITORIO>
+cd bible-tracker
+```
 
-4.  **Configurar as Credenciais (Secrets)**
-    Cria uma pasta chamada `.streamlit` na raiz do projeto e dentro dela um ficheiro `secrets.toml`:
-    
-    ```toml
-    # .streamlit/secrets.toml
-    [supabase]
-    url = "A_TUA_URL_DO_SUPABASE"
-    key = "A_TUA_CHAVE_ANON_PUBLIC_DO_SUPABASE"
-    ```
+### 3. Configurar o Banco de Dados (Supabase)
 
-5.  **Iniciar a Aplicação**
-    ```bash
-    streamlit run app.py
-    ```
+1. Crie um novo projeto na plataforma Supabase.
+2. No painel do seu projeto, vá para a seção **SQL Editor**.
+3. Copie todo o conteúdo do arquivo `scripts/ddl.sql` e execute-o para criar as tabelas necessárias.
+4. **Povoamento dos Dados:** Para que a aplicação funcione, é crucial inserir os dados nas tabelas `tb_usuarios`, `tb_planos`, `tb_livros` e, principalmente, `tb_plano_entradas` (que contém a estrutura dos planos de leitura).
 
-## 🗄️ Configuração da Base de Dados (Supabase)
+### 4. Configurar as Credenciais
 
-Para que a aplicação funcione, precisas de criar as tabelas no **SQL Editor** do Supabase.
+1. Crie uma pasta chamada `.streamlit` na raiz do projeto, caso ela não exista.
+2. Dentro dela, crie um arquivo chamado `secrets.toml`.
+3. Adicione suas credenciais do Supabase (encontradas em `Project Settings > API`) neste arquivo:
 
-### 1. Criar Tabelas
-Execute o seguinte SQL para criar a estrutura:
+```toml
+# .streamlit/secrets.toml
 
-```sql
--- Tabela de Utilizadores
-CREATE TABLE usuarios (
-  id bigint generated by default as identity primary key,
-  nome text not null unique
-);
+[supabase]
+url = "SUA_URL_DO_PROJETO_SUPABASE"
+key = "SUA_CHAVE_ANON_SUPABASE"
+```
 
--- Tabela de Registos de Leitura
-CREATE TABLE leituras (
-  id bigint generated by default as identity primary key,
-  created_at timestamptz default now(),
-  usuario text not null,
-  plano text not null,
-  livro text not null,
-  capitulo int not null
-);
+### 5. Instalar Dependências e Executar
 
--- Tabela de Planos (Metas)
-CREATE TABLE planos (
-    id bigint generated by default as identity primary key,
-    nome_plano text not null,
-    data date not null,
-    livro text not null,
-    capitulos text not null
-);
+O `Makefile` automatiza todo o processo de configuração e execução.
 
--- Políticas de Segurança (RLS) para permitir leitura/escrita pública
-ALTER TABLE usuarios ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Acesso Publico Usuarios" ON usuarios FOR ALL USING (true);
+```bash
+# 1. Cria o ambiente virtual e instala todas as dependências
+make init
 
-ALTER TABLE leituras ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Acesso Publico Leituras" ON leituras FOR ALL USING (true);
+# 2. Inicia a aplicação Streamlit
+make run
+```
 
-ALTER TABLE planos ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Acesso Publico Planos" ON planos FOR SELECT USING (true);
+A aplicação estará disponível em `http://localhost:8501`.
+
+---
+
+## ⚙️ Comandos Disponíveis (`Makefile`)
+
+O projeto utiliza um `Makefile` para simplificar as tarefas de desenvolvimento.
+
+- `make init`: Cria o ambiente virtual e instala todas as dependências do projeto.
+- `make lint`: Executa formatadores e analisadores de código (`black`, `isort`, `flake8`, `mypy`).
+- `make sec`: Realiza verificações de segurança no código (`bandit`) e nas dependências (`pip-audit`).
+- `make check-deps`: Verifica por dependências não utilizadas ou ausentes (`deptry`).
+- `make run`: Inicia a aplicação Streamlit localmente.
+- `make clean`: Remove o ambiente virtual e arquivos de cache.
+- `make help`: Exibe a lista de todos os comandos disponíveis.
+
+---
+
+## 📂 Estrutura do Projeto
+
+```
+bible-tracker/
+├── .streamlit/
+│   └── secrets.toml    # Credenciais (não versionado)
+├── scripts/
+│   └── ddl.sql         # Schema do banco de dados
+├── app.py              # Código principal da aplicação Streamlit
+├── Makefile            # Comandos de automação
+├── pyproject.toml      # Dependências e configurações do projeto
+└── README.md           # Este arquivo
+```

@@ -80,8 +80,8 @@ except Exception as e:
     st.error(f"Erro ao configurar Supabase. Verifique o secrets.toml. {e}")
     st.stop()
 
-
 # --- 3. FUNÇÕES AUXILIARES ---
+
 def expandir_capitulos(str_caps):
     str_caps = str(str_caps).strip()
     if "-" in str_caps:
@@ -124,28 +124,40 @@ def encontrar_proxima_data_nao_lida(df_plano, df_lidos):
 
 
 def buscar_ultimo_plano_ativo(usuario):
+    """Busca o último plano usado por um usuário consultando as novas tabelas."""
     try:
+        # 1. Obter o ID do usuário a partir do nome
+        user_resp = supabase.table("tb_usuarios").select("id").eq("nome", usuario).single().execute()
+        if not user_resp.data:
+            return None
+        user_id = user_resp.data["id"]
+
+        # 2. Buscar a última leitura desse usuário e obter o nome do plano associado
         response = (
-            supabase.table("leituras")
-            .select("plano")
-            .eq("usuario", usuario)
+            supabase.table("tb_leituras")
+            .select("plano:tb_planos(nome)")
+            .eq("usuario_id", user_id)
             .order("created_at", desc=True)
             .limit(1)
+            .single()
             .execute()
         )
 
-        if response.data and len(response.data) > 0:
-            return response.data[0]["plano"]
+        if response.data and response.data.get("plano"):
+            return response.data["plano"]["nome"]
     except Exception as e:
-        # É uma boa prática registrar o erro para depuração, em vez de ignorá-lo.
         print(f"AVISO: Não foi possível buscar o último plano ativo para {usuario}: {e}")
     return None
 
 
 @st.cache_data(ttl=300)
 def carregar_planos():
+    """Carrega todos os planos de leitura e seus detalhes das novas tabelas."""
     try:
-        response = supabase.table("planos").select("*").execute()
+        # Usamos a sintaxe de join do Supabase para buscar dados de tabelas relacionadas
+        response = supabase.table("tb_plano_entradas").select(
+            "data_leitura, capitulos, plano:tb_planos(nome), livro:tb_livros(nome)"
+        ).execute()
 
         df_completo = pd.DataFrame(response.data)
 
@@ -153,50 +165,72 @@ def carregar_planos():
             st.warning("Nenhum plano encontrado no banco de dados.")
             return {}
 
-        # Ajusta formatos
+        # Processar os dados aninhados retornados pelo Supabase
+        df_completo["nome_plano"] = df_completo["plano"].apply(lambda x: x["nome"])
+        df_completo["livro"] = df_completo["livro"].apply(lambda x: x["nome"])
+        df_completo = df_completo.rename(columns={"data_leitura": "data"})
         df_completo["data"] = pd.to_datetime(df_completo["data"])
 
-        # Cria um dicionário separado por nome do plano
+        # Agrupar em um dicionário por nome de plano
         todos_planos = {}
         nomes_planos = df_completo["nome_plano"].unique()
 
         for nome in nomes_planos:
             df_filtrado = df_completo[df_completo["nome_plano"] == nome].copy()
-            # Ordena por data
             df_filtrado = df_filtrado.sort_values(by="data")
-
-            # Pré-cálculo de quantidade de capítulos (para a meta)
             df_filtrado["qtd_capitulos"] = df_filtrado["capitulos"].apply(
                 lambda x: len(expandir_capitulos(x))
             )
             todos_planos[nome] = df_filtrado
 
         return todos_planos
+
     except Exception as e:
-        st.error(f"Erro ao carregar planos do Supabase: {e}")
+        st.error(f"Erro ao carregar planos do banco de dados: {e}")
         return {}
 
 
 def carregar_lista_usuarios():
+    """Carrega a lista de nomes de usuários da tabela tb_usuarios."""
     try:
-        response = supabase.table("usuarios").select("nome").execute()
+        response = supabase.table("tb_usuarios").select("nome").order("nome").execute()
         lista = [item["nome"] for item in response.data]
         return sorted(lista)
     except Exception as e:
-        st.error(f"Erro ao conectar Supabase (Usuários): {e}")
+        st.error(f"Erro ao carregar lista de usuários: {e}")
         return ["Erro"]
 
 
 def carregar_leituras_usuario(usuario, plano):
+    """Carrega o histórico de leitura de um usuário para um plano específico."""
     try:
+        # 1. Obter IDs de usuário e plano
+        user_resp = supabase.table("tb_usuarios").select("id").eq("nome", usuario).single().execute()
+        plano_resp = supabase.table("tb_planos").select("id").eq("nome", plano).single().execute()
+
+        if not user_resp.data or not plano_resp.data:
+            return pd.DataFrame(columns=["Livro", "Capitulo", "Data"])
+
+        user_id = user_resp.data["id"]
+        plano_id = plano_resp.data["id"]
+
+        # 2. Buscar leituras com join para obter o nome do livro
         response = (
-            supabase.table("leituras").select("*").eq("usuario", usuario).eq("plano", plano).execute()
+            supabase.table("tb_leituras")
+            .select("capitulo, created_at, livro:tb_livros(nome)")
+            .eq("usuario_id", user_id)
+            .eq("plano_id", plano_id)
+            .execute()
         )
 
         df = pd.DataFrame(response.data)
+
         if not df.empty:
+            # Processar dados aninhados
+            df["livro"] = df["livro"].apply(lambda x: x["nome"] if isinstance(x, dict) else None)
             df = df.rename(columns={"livro": "Livro", "capitulo": "Capitulo", "created_at": "Data"})
             df["Data"] = pd.to_datetime(df["Data"])
+
         return df
     except Exception as e:
         print(f"AVISO: Não foi possível carregar leituras para {usuario} no plano {plano}: {e}")
@@ -204,29 +238,52 @@ def carregar_leituras_usuario(usuario, plano):
 
 
 def salvar_nova_leitura(usuario, plano, livro, capitulo):
+    """Salva um novo registro de leitura, verificando antes se ele já não existe."""
     try:
-        dados = {
-            "usuario": usuario,
-            "plano": plano,
-            "livro": livro,
-            "capitulo": capitulo,
-        }
-        supabase.table("leituras").insert(dados).execute()
+        # 1. Obter os IDs correspondentes aos nomes
+        user_id = supabase.table("tb_usuarios").select("id").eq("nome", usuario).single().execute().data['id']
+        plano_id = supabase.table("tb_planos").select("id").eq("nome", plano).single().execute().data['id']
+        livro_id = supabase.table("tb_livros").select("id").eq("nome", livro).single().execute().data['id']
+
+        # 2. Verificar se a leitura já existe
+        check_resp = supabase.table("tb_leituras").select("id", count='exact') \
+            .eq("usuario_id", user_id) \
+            .eq("plano_id", plano_id) \
+            .eq("id_livro", livro_id) \
+            .eq("capitulo", capitulo) \
+            .execute()
+
+        # 3. Se não existir (count=0), insere o novo registro
+        if check_resp.count == 0:
+            supabase.table("tb_leituras").insert({
+                "usuario_id": user_id,
+                "plano_id": plano_id,
+                "id_livro": livro_id,
+                "capitulo": capitulo
+            }).execute()
+
     except Exception as e:
         st.error(f"Erro ao salvar: {e}")
 
 
 def calcular_metricas(dict_planos):
+    """Calcula as métricas do dashboard a partir das novas tabelas."""
     try:
-        response = supabase.table("leituras").select("*").execute()
-        df_registros = pd.DataFrame(response.data)
+        # Busca todas as leituras, trazendo o nome do usuário e do plano via join
+        response = supabase.table("tb_leituras").select(
+            "usuario:tb_usuarios(nome), plano:tb_planos(nome)"
+        ).execute()
 
+        df_registros = pd.DataFrame(response.data)
         if df_registros.empty:
             return None, None
 
+        # Processar dados aninhados
+        df_registros["usuario"] = df_registros["usuario"].apply(lambda x: x["nome"])
+        df_registros["plano"] = df_registros["plano"].apply(lambda x: x["nome"])
         df_registros = df_registros.rename(columns={"usuario": "Usuario", "plano": "Plano"})
+
     except Exception as e:
-        # Se a busca principal falhar, exibe um aviso e retorna nulo.
         st.warning(f"Não foi possível carregar os registros para o dashboard: {e}")
         return None, None
 

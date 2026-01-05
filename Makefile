@@ -43,7 +43,7 @@ check-deps: init ## Verifica por dependências não utilizadas ou ausentes.
 
 run: ## Executa localmente a aplicação
 	@echo "--> Iniciando a aplicação..."
-	streamlit run $(SOURCES_DIR)/app.py
+	$(VENV)/bin/streamlit run app.py
 	@echo "--> Aplicação iniciada."
 
 clean: ## Remove o ambiente virtual e arquivos de cache do projeto.
