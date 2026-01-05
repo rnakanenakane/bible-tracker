@@ -266,6 +266,60 @@ def salvar_nova_leitura(usuario, plano, livro, capitulo):
         st.error(f"Erro ao salvar: {e}")
 
 
+def salvar_pergunta(texto_pergunta):
+    """Salva uma nova pergunta anônima no banco de dados."""
+    try:
+        supabase.table("tb_perguntas").insert({"pergunta_texto": texto_pergunta}).execute()
+        st.toast("Pergunta enviada!", icon="✅")
+    except Exception as e:
+        st.error(f"Erro ao salvar pergunta: {e}")
+
+
+def salvar_resposta(pergunta_id, usuario, texto_resposta):
+    """Salva uma nova resposta para uma pergunta existente."""
+    try:
+        user_id = supabase.table("tb_usuarios").select("id").eq("nome", usuario).single().execute().data["id"]
+        supabase.table("tb_respostas").insert(
+            {"pergunta_id": pergunta_id, "usuario_id": user_id, "resposta_texto": texto_resposta}
+        ).execute()
+        st.toast("Resposta enviada!", icon="💬")
+    except Exception as e:
+        st.error(f"Erro ao salvar resposta: {e}")
+
+
+@st.cache_data(ttl=60)
+def carregar_todas_perguntas_com_respostas():
+    """Carrega todas as perguntas e suas respectivas respostas para o mural."""
+    try:
+        # Perguntas são anônimas e não têm joins.
+        perguntas_resp = (
+            supabase.table("tb_perguntas").select("*").order("created_at", desc=True).execute()
+        )
+        if not perguntas_resp.data:
+            return []
+        perguntas = perguntas_resp.data
+        ids_perguntas = [p["id"] for p in perguntas]
+
+        # Respostas continuam com join para pegar o autor.
+        respostas_resp = (
+            supabase.table("tb_respostas")
+            .select("*, autor:tb_usuarios(nome)")
+            .in_("pergunta_id", ids_perguntas)
+            .order("created_at")
+            .execute()
+        )
+        respostas_por_pergunta = {pid: [] for pid in ids_perguntas}
+        for r in respostas_resp.data:
+            respostas_por_pergunta[r["pergunta_id"]].append(r)
+
+        for p in perguntas:
+            p["respostas"] = respostas_por_pergunta.get(p["id"], [])
+        return perguntas
+    except Exception as e:
+        st.error(f"Erro ao carregar o mural de dúvidas: {e}")
+        return []
+
+
 def calcular_metricas(dict_planos):
     """Calcula as métricas do dashboard a partir das novas tabelas."""
     try:
@@ -339,184 +393,273 @@ def calcular_metricas(dict_planos):
 
 # --- 4. INICIALIZAÇÃO DA INTERFACE ---
 
+# Carrega a lista de usuários para a página de login
 lista_usuarios = carregar_lista_usuarios()
-dict_planos = carregar_planos()
 
-if "data_selecionada" not in st.session_state:
-    st.session_state["data_selecionada"] = datetime.now(FUSO_BR)
-if "usuario_anterior" not in st.session_state:
-    st.session_state["usuario_anterior"] = None
-if "plano_anterior" not in st.session_state:
-    st.session_state["plano_anterior"] = None
+if "logged_in_user" not in st.session_state:
+    # --- PÁGINA DE LOGIN ---
+    st.header("Bem-vindo! Selecione seu usuário para continuar.")
 
-with st.sidebar:
-    st.markdown("### ⛪ Menu")
-    pagina = st.radio("Navegar", ["Minha Leitura", "Progresso Geral"], label_visibility="collapsed")
-    st.divider()
-    st.caption("Rondoninha Church © 2026")
+    if not lista_usuarios:
+        st.error("Nenhum usuário cadastrado no sistema. Por favor, popule o banco de dados.")
+        st.stop()
 
-# --- PÁGINA 1: LEITURA ---
-if pagina == "Minha Leitura":
-    col_user, col_plano = st.columns(2)
+    selected_user = st.selectbox("Selecione seu nome", lista_usuarios, index=None, placeholder="Selecione seu nome...")
 
-    with col_user:
+    if st.button("Entrar", type="primary", use_container_width=True, disabled=(not selected_user)):
+        st.session_state["logged_in_user"] = selected_user
+        # Limpa estados antigos para garantir uma sessão limpa
+        for key in ["data_selecionada", "plano_anterior", "user_check_plano"]:
+            if key in st.session_state:
+                del st.session_state[key]
+        st.rerun()
+
+else:
+    # --- APLICAÇÃO PRINCIPAL (APÓS LOGIN) ---
+    usuario = st.session_state["logged_in_user"]
+
+    # Carrega dados necessários para a aplicação
+    dict_planos = carregar_planos()
+
+    # Inicializa o estado da sessão
+    if "data_selecionada" not in st.session_state:
+        st.session_state["data_selecionada"] = datetime.now(FUSO_BR)
+    if "plano_anterior" not in st.session_state:
+        st.session_state["plano_anterior"] = None
+
+    with st.sidebar:
+        st.markdown(f"### Olá, {usuario}!")
+        st.divider()
+        pagina = st.radio(
+            "Navegar", ["Minha Leitura", "Progresso Geral", "Dúvidas da Comunidade"], label_visibility="collapsed"
+        )
+        st.divider()
+        if st.button("Sair"):
+            del st.session_state["logged_in_user"]
+            st.rerun()
+        st.caption("Rondoninha Church © 2026")
+
+    # --- PÁGINA 1: LEITURA ---
+    if pagina == "Minha Leitura":
+        st.header("Meu Plano de Leitura")
+
         if not lista_usuarios:
             st.error("Nenhum usuário encontrado.")
             st.stop()
 
-        usuario = st.selectbox("👤 Quem é você?", lista_usuarios)
+        if not dict_planos:
+            st.warning("Carregando planos...")
+            st.stop()
 
-        if usuario != st.session_state.get("user_check_plano"):
+        # Define o plano padrão para o usuário (último ativo)
+        if "user_check_plano" not in st.session_state or st.session_state.user_check_plano != usuario:
             ultimo_plano = buscar_ultimo_plano_ativo(usuario)
             if ultimo_plano and ultimo_plano in dict_planos:
                 st.session_state["plano_selecionado_widget"] = ultimo_plano
             st.session_state["user_check_plano"] = usuario
 
-    if not dict_planos:
-        st.warning("Carregando planos...")
-        st.stop()
-
-    with col_plano:
         lista_planos_keys = sorted(list(dict_planos.keys()))
+        default_index = 0
+        if "plano_selecionado_widget" in st.session_state and st.session_state.plano_selecionado_widget in lista_planos_keys:
+            default_index = lista_planos_keys.index(st.session_state.plano_selecionado_widget)
+
         plano_nome = st.selectbox(
-            "📅 Escolha o Plano", lista_planos_keys, key="plano_selecionado_widget"
+            "📅 Escolha o Plano", lista_planos_keys, index=default_index
         )
+        st.session_state.plano_selecionado_widget = plano_nome
+        df_plano = dict_planos[plano_nome]
 
-    df_plano = dict_planos[plano_nome]
+        mudou_plano = plano_nome != st.session_state["plano_anterior"]
 
-    mudou_usuario = usuario != st.session_state["usuario_anterior"]
-    mudou_plano = plano_nome != st.session_state["plano_anterior"]
+        if mudou_plano:
+            df_historico = carregar_leituras_usuario(usuario, plano_nome)
+            proxima_data = encontrar_proxima_data_nao_lida(df_plano, df_historico)
 
-    if mudou_usuario or mudou_plano:
-        df_historico = carregar_leituras_usuario(usuario, plano_nome)
+            try:
+                st.session_state["data_selecionada"] = pd.to_datetime(proxima_data)
+                msg_data = pd.to_datetime(proxima_data).strftime("%d/%m")
 
-        proxima_data = encontrar_proxima_data_nao_lida(df_plano, df_historico)
+                if pd.to_datetime(proxima_data).date() != datetime.now(FUSO_BR).date():
+                    st.toast(f"Indo para próxima leitura pendente: {msg_data}", icon="📖")
+                else:
+                    st.toast(f"Tudo em dia! Mostrando hoje: {msg_data}", icon="✅")
 
-        try:
-            st.session_state["data_selecionada"] = pd.to_datetime(proxima_data)
-            msg_data = pd.to_datetime(proxima_data).strftime("%d/%m")
+            except:
+                st.session_state["data_selecionada"] = datetime.now(FUSO_BR)
 
-            if pd.to_datetime(proxima_data).date() != datetime.now(FUSO_BR).date():
-                st.toast(f"Indo para próxima leitura pendente: {msg_data}", icon="📖")
-            elif mudou_usuario:
-                st.toast(f"Tudo em dia! Mostrando hoje: {msg_data}", icon="✅")
+            st.session_state["plano_anterior"] = plano_nome
 
-        except:
-            st.session_state["data_selecionada"] = datetime.now(FUSO_BR)
+        st.markdown("---")
+        c_data, c_info = st.columns([1, 3])
 
-        st.session_state["usuario_anterior"] = usuario
-        st.session_state["plano_anterior"] = plano_nome
+        with c_data:
+            data_input = st.date_input("Data da Leitura", value=st.session_state["data_selecionada"])
+            st.session_state["data_selecionada"] = pd.to_datetime(data_input)
 
-    st.markdown("---")
-    c_data, c_info = st.columns([1, 3])
+        df_plano_valido = df_plano.dropna(subset=["data"])
+        leitura_do_dia = df_plano_valido[
+            df_plano_valido["data"].dt.date == st.session_state["data_selecionada"].date()
+        ]
 
-    with c_data:
-        data_input = st.date_input("Data da Leitura", value=st.session_state["data_selecionada"])
-        st.session_state["data_selecionada"] = pd.to_datetime(data_input)
+        df_lidos = carregar_leituras_usuario(usuario, plano_nome)
 
-    df_plano_valido = df_plano.dropna(subset=["data"])
-    leitura_do_dia = df_plano_valido[
-        df_plano_valido["data"].dt.date == st.session_state["data_selecionada"].date()
-    ]
+        with c_info:
+            if leitura_do_dia.empty:
+                st.info("😴 Nada programado para esta data.")
+            else:
+                for _, row in leitura_do_dia.iterrows():
+                    livro = row["livro"]
+                    caps_str = str(row["capitulos"])
+                    lista_caps = expandir_capitulos(caps_str)
 
-    df_lidos = carregar_leituras_usuario(usuario, plano_nome)
+                    st.markdown(
+                        f"### 📖 {livro} <span style='font-size:0.8em; color:gray'>Caps {caps_str}</span>",
+                        unsafe_allow_html=True,
+                    )
 
-    with c_info:
-        if leitura_do_dia.empty:
-            st.info("😴 Nada programado para esta data.")
-        else:
-            for _, row in leitura_do_dia.iterrows():
-                livro = row["livro"]
-                caps_str = str(row["capitulos"])
-                lista_caps = expandir_capitulos(caps_str)
+                    cols = st.columns(10)
+                    for i, c in enumerate(lista_caps):
+                        chave_botao = f"{usuario}_{plano_nome}_{livro}_{c}"
 
-                st.markdown(
-                    f"### 📖 {livro} <span style='font-size:0.8em; color:gray'>Caps {caps_str}</span>",
-                    unsafe_allow_html=True,
-                )
+                        ja_leu = False
+                        if not df_lidos.empty:
+                            check = df_lidos[(df_lidos["Livro"] == livro) & (df_lidos["Capitulo"] == c)]
+                            if not check.empty:
+                                ja_leu = True
 
-                cols = st.columns(10)
-                for i, c in enumerate(lista_caps):
-                    chave_botao = f"{usuario}_{plano_nome}_{livro}_{c}"
+                        label = f"{c} ✅" if ja_leu else f"{c}"
 
-                    ja_leu = False
-                    if not df_lidos.empty:
-                        check = df_lidos[(df_lidos["Livro"] == livro) & (df_lidos["Capitulo"] == c)]
-                        if not check.empty:
-                            ja_leu = True
+                        if cols[i % 10].button(
+                            label,
+                            key=chave_botao,
+                            disabled=ja_leu,
+                            type="primary" if ja_leu else "secondary",
+                        ):
+                            salvar_nova_leitura(usuario, plano_nome, livro, c)
+                            st.rerun()
 
-                    label = f"{c} ✅" if ja_leu else f"{c}"
+    # --- PÁGINA 2: DASHBOARD ---
+    elif pagina == "Progresso Geral":
+        st.markdown("### 🏆 Dashboard da Comunidade")
+        metricas, df_dash = calcular_metricas(dict_planos)
 
-                    if cols[i % 10].button(
-                        label,
-                        key=chave_botao,
-                        disabled=ja_leu,
-                        type="primary" if ja_leu else "secondary",
-                    ):
-                        salvar_nova_leitura(usuario, plano_nome, livro, c)
-                        st.rerun()
+        if metricas:
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("👥 Leitores", metricas["total_leitores"])
+            c2.metric("📚 Capítulos Lidos", metricas["total_lidos"])
+            c3.metric("🎯 Em Dia", metricas["em_dia"])
+            c4.metric("⚠️ Atrasados", metricas["atrasados"])
 
-# --- PÁGINA 2: DASHBOARD ---
-elif pagina == "Progresso Geral":
-    st.markdown("### 🏆 Dashboard da Comunidade")
-    metricas, df_dash = calcular_metricas(dict_planos)
+            st.markdown("<br>", unsafe_allow_html=True)
 
-    if metricas:
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("👥 Leitores", metricas["total_leitores"])
-        c2.metric("📚 Capítulos Lidos", metricas["total_lidos"])
-        c3.metric("🎯 Em Dia", metricas["em_dia"])
-        c4.metric("⚠️ Atrasados", metricas["atrasados"])
+            if not df_dash.empty:
+                planos_ativos = sorted(df_dash["Plano"].unique())
 
-        st.markdown("<br>", unsafe_allow_html=True)
+                for plano in planos_ativos:
+                    with st.container():
+                        st.write(f"**Plano: {plano}**")
+                        df_filtro = df_dash[df_dash["Plano"] == plano].copy()
 
-        if not df_dash.empty:
-            planos_ativos = sorted(df_dash["Plano"].unique())
+                        base = alt.Chart(df_filtro).encode(y=alt.Y("Usuario", title=None))
 
-            for plano in planos_ativos:
-                with st.container():
-                    st.write(f"**Plano: {plano}**")
-                    df_filtro = df_dash[df_dash["Plano"] == plano].copy()
-
-                    base = alt.Chart(df_filtro).encode(y=alt.Y("Usuario", title=None))
-
-                    barra = base.mark_bar(cornerRadiusTopRight=5, cornerRadiusBottomRight=5).encode(
-                        x=alt.X(
-                            "Pct_Lido",
-                            axis=alt.Axis(format="%", title="Progresso"),
-                            scale=alt.Scale(domain=[0, 1]),
-                        ),
-                        color=alt.Color(
-                            "Status",
-                            scale=alt.Scale(
-                                domain=["Em dia", "Atrasado"],
-                                range=["#2ecc71", "#e74c3c"],
+                        barra = base.mark_bar(cornerRadiusTopRight=5, cornerRadiusBottomRight=5).encode(
+                            x=alt.X(
+                                "Pct_Lido",
+                                axis=alt.Axis(format="%", title="Progresso"),
+                                scale=alt.Scale(domain=[0, 1]),
                             ),
-                            legend=None,
-                        ),
-                        tooltip=["Usuario", "Lidos", "Status"],
+                            color=alt.Color(
+                                "Status",
+                                scale=alt.Scale(
+                                    domain=["Em dia", "Atrasado"],
+                                    range=["#2ecc71", "#e74c3c"],
+                                ),
+                                legend=None,
+                            ),
+                            tooltip=["Usuario", "Lidos", "Status"],
+                        )
+
+                        meta = base.mark_tick(color="black", thickness=3, height=20).encode(
+                            x="Pct_Meta",
+                            tooltip=[alt.Tooltip("Pct_Meta", format=".1%", title="Meta Esperada")],
+                        )
+
+                        texto = base.mark_text(align="left", dx=5, color="black").encode(
+                            x="Pct_Lido", text=alt.Text("Pct_Lido", format=".0%")
+                        )
+
+                        altura = max(120, len(df_filtro) * 60)
+                        st.altair_chart((barra + meta + texto).properties(height=altura, width="container"))
+                        st.divider()
+
+                with st.expander("📂 Ver Tabela Completa"):
+                    st.dataframe(
+                        df_dash[["Usuario", "Plano", "Lidos", "Meta_Hoje", "Status"]],
+                        width="stretch",
+                        hide_index=True,
                     )
-
-                    meta = base.mark_tick(color="black", thickness=3, height=20).encode(
-                        x="Pct_Meta",
-                        tooltip=[alt.Tooltip("Pct_Meta", format=".1%", title="Meta Esperada")],
-                    )
-
-                    texto = base.mark_text(align="left", dx=5, color="black").encode(
-                        x="Pct_Lido", text=alt.Text("Pct_Lido", format=".0%")
-                    )
-
-                    altura = max(120, len(df_filtro) * 60)
-                    st.altair_chart((barra + meta + texto).properties(height=altura, width="container"))
-                    st.divider()
-
-            with st.expander("📂 Ver Tabela Completa"):
-                st.dataframe(
-                    df_dash[["Usuario", "Plano", "Lidos", "Meta_Hoje", "Status"]],
-                    width="stretch",
-                    hide_index=True,
-                )
+            else:
+                st.info("Nenhum dado para exibir.")
         else:
-            st.info("Nenhum dado para exibir.")
-    else:
-        st.info("Ainda não há registros de leitura.")
+            st.info("Ainda não há registros de leitura.")
+
+    # --- PÁGINA 3: DÚVIDAS ---
+    elif pagina == "Dúvidas da Comunidade":
+        st.markdown("### 💬 Mural de Dúvidas e Respostas")
+        st.info("Faça uma pergunta anônima para a comunidade ou ajude a responder as dúvidas existentes.")
+
+        # Formulário para pergunta geral
+        with st.expander("🙋 Faça uma pergunta anônima"):
+            with st.form("form_pergunta_geral", clear_on_submit=True):
+                texto_pergunta_geral = st.text_area(
+                    "Qual sua dúvida?", height=100, placeholder="Sua pergunta será postada anonimamente."
+                )
+                submetido_geral = st.form_submit_button("Enviar Pergunta")
+
+                if submetido_geral and texto_pergunta_geral:
+                    salvar_pergunta(texto_pergunta_geral)
+                    carregar_todas_perguntas_com_respostas.clear()
+                    st.rerun()
+
+        st.markdown("---")
+        st.markdown("### Mural")
+
+        # O usuário para responder é o mesmo que fez login
+        usuario_atual = st.session_state["logged_in_user"]
+
+        perguntas = carregar_todas_perguntas_com_respostas()
+
+        if not perguntas:
+            st.success("Nenhuma dúvida no mural por enquanto. Seja o primeiro a perguntar!")
+        else:
+            # Ordena para mostrar perguntas não respondidas primeiro
+            perguntas.sort(key=lambda p: len(p["respostas"]) > 0)
+
+            for p in perguntas:
+                # Adiciona um indicador de status (respondida ou não)
+                indicator = "✅" if p["respostas"] else "❔"
+                expander_title = f"{indicator} **Pergunta**: {p['pergunta_texto'][:75]}..."
+
+                with st.expander(expander_title):
+                    st.markdown("**Perguntado por:** `Anônimo`")
+                    st.markdown("---")
+                    st.markdown("##### Pergunta Completa:")
+                    st.info(p["pergunta_texto"])
+
+                    st.markdown("---")
+                    st.markdown("##### Respostas:")
+                    if not p["respostas"]:
+                        st.write("Ainda não há respostas. Seja o primeiro a ajudar!")
+                    else:
+                        for r in p["respostas"]:
+                            autor_resposta = r["autor"]["nome"] if r.get("autor") else "Usuário desconhecido"
+                            with st.container(border=True):
+                                st.markdown(f"**`{autor_resposta}` respondeu:**")
+                                st.write(r["resposta_texto"])
+
+                    with st.form(key=f"form_resposta_{p['id']}", clear_on_submit=True):
+                        texto_resposta = st.text_area("Sua resposta:", height=120, key=f"ta_{p['id']}")
+                        if st.form_submit_button("Enviar Resposta") and texto_resposta:
+                            salvar_resposta(p["id"], usuario_atual, texto_resposta)
+                            carregar_todas_perguntas_com_respostas.clear()
+                            st.rerun()

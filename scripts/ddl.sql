@@ -34,17 +34,16 @@ CREATE TABLE tb_leituras (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
+CREATE TABLE tb_perguntas (
+    id SERIAL PRIMARY KEY,
+    pergunta_texto TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
 
--- insert into tb_leituras (usuario_id, plano_id, id_livro, capitulo, created_at)
--- select tb_usuarios.id,
---        tb_planos.id,
---        tb_livros.id,
---        capitulo,
---        leituras.created_at
--- from leituras inner join tb_usuarios
--- on tb_usuarios.nome = leituras.usuario
--- inner join tb_planos
--- on tb_planos.nome = leituras.plano
--- inner join tb_livros
--- on tb_livros.nome = leituras.livro
--- order by created_at
+CREATE TABLE tb_respostas (
+    id SERIAL PRIMARY KEY,
+    pergunta_id INTEGER NOT NULL REFERENCES tb_perguntas(id) ON DELETE CASCADE,
+    usuario_id INTEGER NOT NULL REFERENCES tb_usuarios(id),
+    resposta_texto TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT now()
+);

@@ -12,6 +12,7 @@ Uma aplicação web desenvolvida com Streamlit para acompanhar o progresso de le
 - **Seleção de Planos:** Escolha entre diferentes planos de leitura disponíveis no banco de dados.
 - **Navegação Inteligente:** O sistema direciona automaticamente para a próxima data com leitura pendente.
 - **Dashboard Comunitário:** Visualize o progresso de todos os participantes em um gráfico interativo, comparando o avanço de cada um com a meta do plano.
+- **Mural de Dúvidas Anônimas:** Faça perguntas de forma anônima para a comunidade e responda às dúvidas de outros membros.
 - **Status de Leitura:** Identifique facilmente quem está "Em dia" ou "Atrasado" em relação ao cronograma.
 
 ---
