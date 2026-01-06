@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 VENV := .venv
-SOURCES_DIR := ./src
+SOURCES_DIR := ./src app.py
 
 # Define o alvo padrão que será executado quando 'make' for chamado sem argumentos.
 .DEFAULT_GOAL := help
@@ -17,6 +17,9 @@ $(VENV)/.timestamp: pyproject.toml
 	@echo "--> Instalando dependências do projeto e de desenvolvimento..."
 	# Instala as dependências do projeto e as de desenvolvimento (definidas como 'dev' no pyproject.toml)
 	$(VENV)/bin/pip install ".[dev]"
+	@echo "--> Instalando hooks de pré-commit..."
+	$(VENV)/bin/pre-commit install
+	@echo "--> Hooks instalados."
 	touch $(VENV)/.timestamp
 
 
@@ -26,7 +29,7 @@ lint: init ## Executa formatadores e analisadores de código (black, isort, flak
 	$(VENV)/bin/black .
 	$(VENV)/bin/isort .
 	$(VENV)/bin/flake8 $(SOURCES_DIR)
-	$(VENV)/bin/mypy $(SOURCES_DIR)
+	$(VENV)/bin/mypy
 	@echo "--> Verificação concluída."
 
 sec: init ## Executa verificações de segurança no código e nas dependências.

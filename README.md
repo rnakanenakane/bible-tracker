@@ -100,14 +100,22 @@ O projeto utiliza um `Makefile` para simplificar as tarefas de desenvolvimento.
 
 ## 📂 Estrutura do Projeto
 
-```
+```bash
 bible-tracker/
 ├── .streamlit/
-│   └── secrets.toml    # Credenciais (não versionado)
+│   └── secrets.toml        # Credenciais (não versionado)
 ├── scripts/
-│   └── ddl.sql         # Schema do banco de dados
-├── app.py              # Código principal da aplicação Streamlit
-├── Makefile            # Comandos de automação
-├── pyproject.toml      # Dependências e configurações do projeto
-└── README.md           # Este arquivo
+│   └── ddl.sql             # Schema do banco de dados
+├── src/                    # Código fonte da aplicação
+│   ├── __init__.py         # Inicializador do pacote
+│   ├── config.py           # Configurações e conexão com o DB
+│   ├── models.py           # Modelos de dados (Pydantic)
+│   ├── repository.py       # Camada de acesso a dados
+│   ├── ui.py               # Lógica da interface do usuário
+│   └── utils.py            # Funções utilitárias
+├── .pre-commit-config.yaml # Configuração dos hooks de pré-commit
+├── app.py                  # Ponto de entrada da aplicação
+├── Makefile                # Comandos de automação
+├── pyproject.toml          # Dependências e configurações do projeto
+└── README.md               # Este arquivo
 ```

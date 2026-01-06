@@ -22,7 +22,10 @@ dev = [
     "bandit==1.7.9",  
     "pip-audit==2.7.3",
     "pip-tools==7.4.1",
+    "pydantic==2.12.5",
     "toml-to-requirements==0.3.0",
+    "postgrest==2.27.0",
+    "pre-commit"
 ]
 
 [tool.black]
@@ -33,3 +36,4 @@ profile = "black"
 
 [tool.mypy]
 ignore_missing_imports = true
+files = ["app.py", "src"]
