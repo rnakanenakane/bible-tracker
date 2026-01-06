@@ -8,17 +8,17 @@ set -o pipefail
 
 echo "--- INICIANDO PROCESSO DE BUILD ---"
 
-# echo "--> 1. Limpando o ambiente..."
-# make clean
+echo "--> 1. Limpando o ambiente..."
+make clean
 
-# echo "--> 2. Instalando dependências..."
-# make init
+echo "--> 2. Instalando dependências..."
+make init
 
-# echo "--> 3. Verificando qualidade do código (lint)..."
-# make lint
+echo "--> 3. Verificando qualidade do código (lint)..."
+make lint
 
-# echo "--> 4. Verificando segurança (sec)..."
-# make sec
+echo "--> 4. Verificando segurança (sec)..."
+make sec
 
 echo "--> 5. Gerando requirements.txt para produção..."
 .venv/bin/toml-to-req --toml-file pyproject.toml
