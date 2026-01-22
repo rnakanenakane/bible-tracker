@@ -98,7 +98,32 @@ O projeto utiliza um `Makefile` para simplificar as tarefas de desenvolvimento.
 
 ---
 
-## 📂 Estrutura do Projeto
+## 🗄️ Tarefas de Manutenção
+
+### Atualizando Selos de Conclusão Retroativos
+
+Se a aplicação esteve em uso antes da implementação da funcionalidade de "Selos de Conclusão", a tabela `tb_livros_concluidos` pode não refletir os livros que já foram completados.
+
+Para corrigir isso, existe um script de *backfill* que processa todos os registros de leitura existentes e popula a tabela de conclusões corretamente.
+
+1.  **Crie um arquivo `.env`** na raiz do projeto com as credenciais do Supabase. É **essencial** usar a chave `service_role` para que o script tenha as permissões necessárias.
+
+    ```
+    SUPABASE_URL="SUA_URL_DO_PROJETO_SUPABASE"
+    SUPABASE_SERVICE_KEY="SUA_CHAVE_SERVICE_ROLE_SUPABASE"
+    ```
+
+2.  Execute o script diretamente via Python (com o ambiente virtual ativado):
+
+    ```bash
+    python scripts/backfill_completions.py
+    ```
+
+Este processo precisa ser executado apenas uma vez para sincronizar os dados históricos.
+
+---
+
+## � Estrutura do Projeto
 
 ```bash
 bible-tracker/

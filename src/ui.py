@@ -8,7 +8,12 @@ import streamlit as st
 from src.config import FUSO_BR
 from src.models import Usuario
 from src.repository import DatabaseRepository
-from src.utils import expandir_capitulos
+from src.utils import (
+    BIBLE_BOOKS_DATA,
+    expandir_capitulos,
+    get_total_bible_chapters,
+    load_book_images_map,
+)
 
 
 def apply_styles():
@@ -80,7 +85,7 @@ def render_login_page(users: list[Usuario]) -> Optional[Usuario]:
         "Selecione seu nome", list(user_map.keys()), index=None, placeholder="Selecione seu nome..."
     )
 
-    if st.button("Entrar", type="primary", disabled=(not selected_user_name), width="stretch"):
+    if st.button("Entrar", type="primary", disabled=(not selected_user_name)):
         if selected_user_name:
             return user_map.get(selected_user_name)
     return None
@@ -93,7 +98,7 @@ def render_sidebar(user: Usuario) -> tuple[str, bool]:
         st.divider()
         pagina = st.radio(
             "Navegar",
-            ["Minha Leitura", "Progresso Geral", "Dúvidas da Comunidade"],
+            ["Minha Leitura", "Progresso Geral", "Awards", "Dúvidas da Comunidade"],
             label_visibility="collapsed",
         )
         st.divider()
@@ -198,12 +203,84 @@ def render_reading_page(user: Usuario, repo: DatabaseRepository, plans: dict[str
                         st.rerun()
 
 
+def _render_user_seals(books: set[str], book_images_map: dict[str, str]):
+    """Helper para renderizar os selos de um usuário em uma grade."""
+    seals_per_row = 6  # Menos colunas = imagens maiores
+    sorted_books = sorted(
+        list(books),
+        key=lambda book_name: BIBLE_BOOKS_DATA.get(book_name, {"order": 999})["order"],
+    )
+
+    book_chunks = [
+        sorted_books[i : i + seals_per_row] for i in range(0, len(sorted_books), seals_per_row)
+    ]
+
+    for chunk in book_chunks:
+        cols = st.columns(seals_per_row)
+        for i, book_name in enumerate(chunk):
+            with cols[i]:
+                image_path = book_images_map.get(book_name)
+                if image_path:
+                    st.image(image_path)
+                else:
+                    # Fallback para o nome do livro se a imagem não for encontrada
+                    st.caption(book_name)
+
+
+def render_awards_page(user: Usuario, repo: DatabaseRepository):
+    """Renderiza a página de 'Awards', destacando o usuário logado e a comunidade."""
+    st.markdown("# 🏅 Insígnias de Conclusão")
+
+    completed_books = repo.get_completed_books_dashboard()
+    book_images_map = load_book_images_map()
+
+    # --- Seção do Usuário Logado ---
+    st.markdown("### 🌟 Minhas Insígnias")
+
+    # Adiciona o cálculo e exibição do progresso geral de leitura da Bíblia
+    total_bible_chapters = get_total_bible_chapters()
+    user_chapters_read = repo.get_user_unique_readings_count(user.id)
+
+    if total_bible_chapters > 0:
+        progress_pct = user_chapters_read / total_bible_chapters
+        st.metric(
+            label="Progresso na Bíblia Completa",
+            value=f"{progress_pct:.1%}",
+            help=f"Você leu {user_chapters_read} de {total_bible_chapters} capítulos.",
+        )
+        st.progress(progress_pct)
+
+    my_books = completed_books.get(user.nome)
+
+    if my_books:
+        _render_user_seals(my_books, book_images_map)
+    else:
+        st.info(
+            "Você ainda não possui insígnias. Conclua a leitura de um livro para ganhar a sua primeira!"
+        )
+
+    st.divider()
+
+    # --- Seção da Comunidade ---
+    st.markdown("### 🏆 Insígnias da Comunidade")
+    other_users_completed = {name: books for name, books in completed_books.items() if name != user.nome}
+
+    if not other_users_completed:
+        st.info("Nenhum outro membro da comunidade concluiu um livro ainda.")
+        return
+
+    for other_user_name in sorted(other_users_completed.keys()):
+        books = other_users_completed[other_user_name]
+        st.markdown(f"**{other_user_name}:**")
+        _render_user_seals(books, book_images_map)
+        st.markdown("<br>", unsafe_allow_html=True)
+
+
 def _calculate_dashboard_metrics(
-    repo: DatabaseRepository, plans: dict[str, pd.DataFrame]
+    df_registros: pd.DataFrame, plans: dict[str, pd.DataFrame]
 ) -> tuple[Optional[dict], Optional[pd.DataFrame]]:
     """Função auxiliar para calcular as métricas do dashboard."""
-    df_registros = repo.get_all_readings_for_dashboard()
-    if df_registros.empty:
+    if df_registros is None or df_registros.empty:
         return None, None
 
     dados_consolidados = []
@@ -248,10 +325,17 @@ def _calculate_dashboard_metrics(
 def render_dashboard_page(repo: DatabaseRepository, plans: dict[str, pd.DataFrame]):
     """Renderiza a página 'Progresso Geral'."""
     st.markdown("### 🏆 Dashboard da Comunidade")
-    metricas, df_dash = _calculate_dashboard_metrics(repo, plans)
+
+    df_registros = repo.get_all_readings_for_dashboard()
+    if df_registros.empty:
+        st.info("Ainda não há registros de leitura para exibir os gráficos de progresso.")
+        return
+
+    # Calcula e exibe as métricas e gráficos de progresso
+    metricas, df_dash = _calculate_dashboard_metrics(df_registros, plans)
 
     if not metricas or df_dash is None:
-        st.info("Ainda não há registros de leitura para exibir o dashboard.")
+        st.info("Não foi possível calcular as métricas de progresso.")
         return
 
     c1, c2, c3, c4 = st.columns(4)
@@ -292,8 +376,8 @@ def render_dashboard_page(repo: DatabaseRepository, plans: dict[str, pd.DataFram
     with st.expander("📂 Ver Tabela Completa"):
         st.dataframe(
             df_dash[["Usuario", "Plano", "Lidos", "Meta_Hoje", "Status"]],
-            use_container_width=True,
             hide_index=True,
+            width="stretch",
         )
 
 

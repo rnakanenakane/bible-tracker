@@ -149,8 +149,26 @@ class DatabaseRepository:
                         "capitulo": chapter,
                     }
                 ).execute()
+                # Após salvar, verifica se o livro foi concluído.
+                self._check_and_save_book_completion(user.id, plano_id, livro_id)
         except Exception as e:
             st.error(f"Erro ao salvar leitura: {e}")
+
+    def _check_and_save_book_completion(self, usuario_id: int, plano_id: int, livro_id: int):
+        """
+        Verifica se um livro foi concluído chamando uma função de banco de dados (RPC).
+        A função de banco de dados 'handle_book_completion_check' contém a lógica
+        e é executada com privilégios elevados (SECURITY DEFINER) para poder inserir
+        na tabela tb_livros_concluidos, resolvendo problemas de RLS.
+        """
+        try:
+            self._client.rpc(
+                "handle_book_completion_check",
+                {"p_usuario_id": usuario_id, "p_plano_id": plano_id, "p_livro_id": livro_id},
+            ).execute()
+        except Exception as e:
+            # O erro é logado no console, mas não interrompe o usuário
+            print(f"AVISO: Erro ao verificar conclusão do livro via RPC: {e}")
 
     def save_question(self, text: str) -> None:
         """Salva uma nova pergunta anônima."""
@@ -209,6 +227,54 @@ class DatabaseRepository:
         except Exception as e:
             st.error(f"Erro ao carregar o mural de dúvidas: {e}")
             return []
+
+    def get_user_unique_readings_count(self, user_id: int) -> int:
+        """
+        Conta o número de capítulos únicos lidos por um usuário via RPC.
+        Requer a função de banco de dados 'count_unique_readings_for_user'.
+        """
+        try:
+            response = self._client.rpc(
+                "count_unique_readings_for_user",
+                {"p_usuario_id": user_id},
+            ).execute()
+            if isinstance(response.data, int):
+                return response.data
+            return 0
+        except Exception as e:
+            # Não mostra erro na tela, apenas no log, para não poluir a UI de 'Awards'.
+            print(f"AVISO: Não foi possível contar as leituras únicas do usuário: {e}")
+            return 0
+
+    @st.cache_data(ttl=60)
+    def get_completed_books_dashboard(_self) -> dict[str, set[str]]:
+        """Busca os livros concluídos da tabela consolidada para o dashboard."""
+        try:
+            response = (
+                _self._client.table("tb_livros_concluidos")
+                .select("usuario:tb_usuarios(nome), livro:tb_livros(nome)")
+                .execute()
+            )
+
+            if not response.data:
+                return {}
+
+            completed_books: dict[str, set[str]] = {}
+            for row in response.data:
+                if not isinstance(row, dict):
+                    continue
+
+                user_info = row.get("usuario")
+                book_info = row.get("livro")
+                if isinstance(user_info, dict) and isinstance(book_info, dict):
+                    user_name = user_info.get("nome")
+                    book_name = book_info.get("nome")
+                    if isinstance(user_name, str) and isinstance(book_name, str):
+                        completed_books.setdefault(user_name, set()).add(book_name)
+            return completed_books
+        except Exception as e:
+            st.warning(f"Não foi possível carregar os selos de conclusão: {e}")
+            return {}
 
     def get_all_readings_for_dashboard(self) -> pd.DataFrame:
         """Busca todas as leituras para o cálculo das métricas do dashboard."""

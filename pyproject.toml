@@ -6,10 +6,10 @@ requires-python = ">=3.11"
 dependencies = [
     "streamlit~=1.52",
     "pandas~=2.3",
-    "duckdb~=1.4",
     "supabase~=2.27",
     "altair~=6.0",
     "types-pytz==2025.2.0.20251108",
+    "pyyaml==6.0.3",
 ]
 
 [project.optional-dependencies]
@@ -19,6 +19,8 @@ dev = [
     "isort==7.0.0",
     "mypy==1.19.1",
     "deptry==0.18.0", 
+    "types-PyYAML==6.0.12.20240311",
+    "dotenv==0.9.9",
     "bandit==1.7.9",  
     "pip-audit==2.7.3",
     "pip-tools==7.4.1",

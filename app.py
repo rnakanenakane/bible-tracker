@@ -5,6 +5,7 @@ from src.models import Usuario
 from src.repository import DatabaseRepository
 from src.ui import (
     apply_styles,
+    render_awards_page,
     render_dashboard_page,
     render_login_page,
     render_qa_page,
@@ -54,6 +55,8 @@ def main():
             render_reading_page(current_user, repo, all_plans)
         elif page == "Progresso Geral":
             render_dashboard_page(repo, all_plans)
+        elif page == "Awards":
+            render_awards_page(current_user, repo)
         elif page == "Dúvidas da Comunidade":
             render_qa_page(current_user, repo)
 
