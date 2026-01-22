@@ -3,7 +3,20 @@ import yaml
 
 
 def expandir_capitulos(str_caps: str) -> list[int]:
-    """Expande uma string de capítulos (ex: '1-3' ou '5') para uma lista de inteiros."""
+    """Expande uma string de capítulos (ex: '1-3' ou '5') para uma lista de inteiros.
+
+    Esta função interpreta uma string que representa um ou mais capítulos de um livro.
+    Se a string contiver um hífen (ex: "1-3"), ela será interpretada como um intervalo
+    e retornará uma lista de todos os inteiros nesse intervalo (inclusive).
+    Se a string for um único número (ex: "5"), retornará uma lista contendo apenas esse número.
+    Em caso de formato inválido ou erro de conversão, retorna uma lista vazia.
+
+    Args:
+        str_caps: A string contendo a representação dos capítulos (ex: "1-3", "5").
+
+    Returns:
+        Uma lista de inteiros representando os capítulos expandidos.
+    """
     str_caps = str(str_caps).strip()
     if "-" in str_caps:
         try:
@@ -20,7 +33,20 @@ def expandir_capitulos(str_caps: str) -> list[int]:
 
 @st.cache_data
 def load_book_images_map(path: str = "book_images.yaml") -> dict[str, str]:
-    """Carrega o mapeamento de livros para imagens de um arquivo YAML."""
+    """Carrega o mapeamento de nomes de livros para caminhos de imagem de um arquivo YAML.
+
+    Este método lê um arquivo YAML que associa o nome canônico de um livro da Bíblia
+    ao caminho do arquivo de imagem correspondente. Ele é cacheado pelo Streamlit
+    para evitar leituras repetidas do disco.
+
+    Args:
+        path: O caminho para o arquivo YAML contendo o mapeamento.
+
+    Returns:
+        Um dicionário onde as chaves são os nomes dos livros (str) e os valores
+        são os caminhos das imagens (str). Retorna um dicionário vazio se o
+        arquivo não for encontrado ou se houver um erro de processamento.
+    """
     try:
         with open(path, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
@@ -109,5 +135,12 @@ BIBLE_BOOKS_DATA = {
 
 
 def get_total_bible_chapters() -> int:
-    """Calcula o número total de capítulos na Bíblia a partir de um mapa estático."""
+    """Calcula o número total de capítulos em toda a Bíblia.
+
+    Este cálculo é baseado nos dados estáticos definidos em `BIBLE_BOOKS_DATA`,
+    que contém o número de capítulos para cada livro.
+
+    Returns:
+        O número total de capítulos em todos os livros da Bíblia.
+    """
     return sum(book_data["chapters"] for book_data in BIBLE_BOOKS_DATA.values())
