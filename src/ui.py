@@ -66,6 +66,17 @@ def apply_styles():
             h2, h3 { color: #fafafa; }
             section[data-testid="stSidebar"] { background-color: #1e1e1e; }
         }
+
+        /* Estilos específicos para a página de Awards em telas pequenas */
+        @media (max-width: 768px) {
+            .awards-page-container div[data-testid="stHorizontalBlock"] {
+                flex-wrap: wrap; /* Garante que os itens quebrem para a próxima linha */
+            }
+            .awards-page-container div[data-testid="stHorizontalBlock"] > div[data-testid="stVerticalBlock"] {
+                flex-basis: calc(50% - 1rem); /* Duas colunas, considerando o espaçamento padrão do Streamlit */
+                max-width: calc(50% - 1rem);
+            }
+        }
     </style>
     """,
         unsafe_allow_html=True,
@@ -122,6 +133,7 @@ def render_sidebar(user: Usuario) -> tuple[str, bool]:
             "Navegar",
             ["Minha Leitura", "Progresso Geral", "Awards", "Dúvidas da Comunidade"],
             label_visibility="collapsed",
+            key="page_selection",
         )
         st.divider()
         logout_clicked = st.button("Sair")
@@ -177,11 +189,13 @@ def render_reading_page(user: Usuario, repo: DatabaseRepository, plans: dict[str
     # Exibe a mensagem de comemoração se um livro foi recém-concluído.
     # A flag é definida no clique do botão e lida aqui após o rerun.
     if "book_just_completed" in st.session_state:
-        book_name = st.session_state["book_just_completed"]
+        book_name = st.session_state.pop("book_just_completed")  # Pega e remove para mostrar só uma vez
         st.balloons()
         st.success(f"Parabéns! Você concluiu a leitura de {book_name}! 🎉")
-        st.info("Confira sua nova insígnia na página de 'Awards'.")
-        del st.session_state["book_just_completed"]
+        if st.button("Ver minha nova insígnia na página de Awards 🏆"):
+            # Define o estado do menu para a página de Awards e força o rerun
+            st.session_state["page_selection"] = "Awards"
+            st.rerun()
 
     st.header("Meu Plano de Leitura")
 
@@ -284,51 +298,58 @@ def _render_user_seals(books: set[str], book_images_map: dict[str, str]):
 
 def render_awards_page(user: Usuario, repo: DatabaseRepository):
     """Renderiza a página de 'Awards', destacando o usuário logado e a comunidade."""
-    st.markdown("# 🏅 Insígnias de Conclusão")
+    # Envolve todo o conteúdo da página de awards em uma div com uma classe personalizada para CSS direcionado
+    st.markdown('<div class="awards-page-container">', unsafe_allow_html=True)
+    try:
+        st.markdown("# 🏅 Insígnias de Conclusão")
 
-    completed_books = repo.get_completed_books_dashboard()
-    book_images_map = load_book_images_map()
+        completed_books = repo.get_completed_books_dashboard()
+        book_images_map = load_book_images_map()
 
-    # --- Seção do Usuário Logado ---
-    st.markdown("### 🌟 Minhas Insígnias")
+        # --- Seção do Usuário Logado ---
+        st.markdown("### 🌟 Minhas Insígnias")
 
-    # Adiciona o cálculo e exibição do progresso geral de leitura da Bíblia
-    total_bible_chapters = get_total_bible_chapters()
-    user_chapters_read = repo.get_user_unique_readings_count(user.id)
+        # Adiciona o cálculo e exibição do progresso geral de leitura da Bíblia
+        total_bible_chapters = get_total_bible_chapters()
+        user_chapters_read = repo.get_user_unique_readings_count(user.id)
 
-    if total_bible_chapters > 0:
-        progress_pct = user_chapters_read / total_bible_chapters
-        st.metric(
-            label="Progresso na Bíblia Completa",
-            value=f"{progress_pct:.1%}",
-            help=f"Você leu {user_chapters_read} de {total_bible_chapters} capítulos.",
-        )
-        st.progress(progress_pct)
+        if total_bible_chapters > 0:
+            progress_pct = user_chapters_read / total_bible_chapters
+            st.metric(
+                label="Progresso na Bíblia Completa",
+                value=f"{progress_pct:.1%}",
+                help=f"Você leu {user_chapters_read} de {total_bible_chapters} capítulos.",
+            )
+            st.progress(progress_pct)
 
-    my_books = completed_books.get(user.nome)
+        my_books = completed_books.get(user.nome)
 
-    if my_books:
-        _render_user_seals(my_books, book_images_map)
-    else:
-        st.info(
-            "Você ainda não possui insígnias. Conclua a leitura de um livro para ganhar a sua primeira!"
-        )
+        if my_books:
+            _render_user_seals(my_books, book_images_map)
+        else:
+            st.info(
+                "Você ainda não possui insígnias. Conclua a leitura de um livro para ganhar a sua primeira!"
+            )
 
-    st.divider()
+        st.divider()
 
-    # --- Seção da Comunidade ---
-    st.markdown("### 🏆 Insígnias da Comunidade")
-    other_users_completed = {name: books for name, books in completed_books.items() if name != user.nome}
+        # --- Seção da Comunidade ---
+        st.markdown("### 🏆 Insígnias da Comunidade")
+        other_users_completed = {
+            name: books for name, books in completed_books.items() if name != user.nome
+        }
 
-    if not other_users_completed:
-        st.info("Nenhum outro membro da comunidade concluiu um livro ainda.")
-        return
+        if not other_users_completed:
+            st.info("Nenhum outro membro da comunidade concluiu um livro ainda.")
+            return
 
-    for other_user_name in sorted(other_users_completed.keys()):
-        books = other_users_completed[other_user_name]
-        st.markdown(f"**{other_user_name}:**")
-        _render_user_seals(books, book_images_map)
-        st.markdown("<br>", unsafe_allow_html=True)
+        for other_user_name in sorted(other_users_completed.keys()):
+            books = other_users_completed[other_user_name]
+            st.markdown(f"**{other_user_name}:**")
+            _render_user_seals(books, book_images_map)
+            st.markdown("<br>", unsafe_allow_html=True)
+    finally:
+        st.markdown("</div>", unsafe_allow_html=True)  # Fecha a div personalizada
 
 
 def _calculate_dashboard_metrics(
