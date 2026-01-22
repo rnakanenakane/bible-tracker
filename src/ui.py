@@ -174,6 +174,15 @@ def render_reading_page(user: Usuario, repo: DatabaseRepository, plans: dict[str
         repo: A instância do repositório de banco de dados.
         plans: Um dicionário com todos os planos de leitura estruturados.
     """
+    # Exibe a mensagem de comemoração se um livro foi recém-concluído.
+    # A flag é definida no clique do botão e lida aqui após o rerun.
+    if "book_just_completed" in st.session_state:
+        book_name = st.session_state["book_just_completed"]
+        st.balloons()
+        st.success(f"Parabéns! Você concluiu a leitura de {book_name}! 🎉")
+        st.info("Confira sua nova insígnia na página de 'Awards'.")
+        del st.session_state["book_just_completed"]
+
     st.header("Meu Plano de Leitura")
 
     if not plans:
@@ -243,7 +252,9 @@ def render_reading_page(user: Usuario, repo: DatabaseRepository, plans: dict[str
                         disabled=ja_leu,
                         type="primary" if ja_leu else "secondary",
                     ):
-                        repo.save_reading(user, plano_nome, livro, c)
+                        book_completed = repo.save_reading(user, plano_nome, livro, c)
+                        if book_completed:
+                            st.session_state["book_just_completed"] = livro
                         st.rerun()
 
 

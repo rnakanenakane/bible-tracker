@@ -144,7 +144,7 @@ class DatabaseRepository:
             )
             return []
 
-    def save_reading(self, user: Usuario, plan_name: str, book_name: str, chapter: int) -> None:
+    def save_reading(self, user: Usuario, plan_name: str, book_name: str, chapter: int) -> bool:
         """Salva um novo registro de leitura para um usuário.
 
         Antes de salvar, verifica se o registro já existe para evitar duplicatas.
@@ -155,14 +155,18 @@ class DatabaseRepository:
             plan_name: O nome do plano de leitura associado.
             book_name: O nome do livro lido.
             chapter: O número do capítulo lido.
+
+        Returns:
+            True se o livro foi recém-concluído, False caso contrário.
         """
+        book_completed = False
         try:
             plano_resp = (
                 self._client.table("tb_planos").select("id").eq("nome", plan_name).single().execute()
             )
             if not plano_resp.data or not isinstance(plano_resp.data, dict):
                 st.error(f"Plano '{plan_name}' não encontrado.")
-                return
+                return book_completed
             plano_id = plano_resp.data["id"]
 
             livro_resp = (
@@ -170,7 +174,7 @@ class DatabaseRepository:
             )
             if not livro_resp.data or not isinstance(livro_resp.data, dict):
                 st.error(f"Livro '{book_name}' não encontrado.")
-                return
+                return book_completed
             livro_id = livro_resp.data["id"]
 
             check_resp = (
@@ -193,11 +197,12 @@ class DatabaseRepository:
                     }
                 ).execute()
                 # Após salvar, verifica se o livro foi concluído.
-                self._check_and_save_book_completion(user.id, plano_id, livro_id)
+                book_completed = self._check_and_save_book_completion(user.id, plano_id, livro_id)
         except Exception as e:
             st.error(f"Erro ao salvar leitura: {e}")
+        return book_completed
 
-    def _check_and_save_book_completion(self, usuario_id: int, plano_id: int, livro_id: int):
+    def _check_and_save_book_completion(self, usuario_id: int, plano_id: int, livro_id: int) -> bool:
         """
         Verifica se um livro foi concluído e salva o registro de conclusão.
 
@@ -213,15 +218,21 @@ class DatabaseRepository:
             usuario_id: O ID do usuário.
             plano_id: O ID do plano de leitura.
             livro_id: O ID do livro a ser verificado.
+
+        Returns:
+            True se o livro foi recém-concluído, False caso contrário.
         """
         try:
-            self._client.rpc(
+            response = self._client.rpc(
                 "handle_book_completion_check",
                 {"p_usuario_id": usuario_id, "p_plano_id": plano_id, "p_livro_id": livro_id},
             ).execute()
+            if isinstance(response.data, bool):
+                return response.data
         except Exception as e:
             # O erro é logado no console, mas não interrompe o usuário
             print(f"AVISO: Erro ao verificar conclusão do livro via RPC: {e}")
+        return False
 
     def save_question(self, text: str) -> None:
         """Salva uma nova pergunta anônima no mural de dúvidas.

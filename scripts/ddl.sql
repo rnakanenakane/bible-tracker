@@ -99,7 +99,7 @@ CREATE OR REPLACE FUNCTION public.handle_book_completion_check(
     p_plano_id BIGINT,
     p_livro_id BIGINT
 )
-RETURNS void
+RETURNS BOOLEAN -- Modificado de 'void' para 'BOOLEAN'
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
@@ -108,17 +108,17 @@ DECLARE
     read_chapters_count INT;
     already_completed INT;
 BEGIN
-    -- 1. Check if already completed to avoid redundant work.
+    -- 1. Verifica se o livro já foi concluído para evitar trabalho redundante.
     SELECT count(*)
     INTO already_completed
     FROM public.tb_livros_concluidos
     WHERE usuario_id = p_usuario_id AND plano_id = p_plano_id AND id_livro = p_livro_id;
 
     IF already_completed > 0 THEN
-        RETURN;
+        RETURN FALSE; -- Não foi recém-concluído.
     END IF;
 
-    -- 2. Calculate the total number of chapters required by the plan for this book.
+    -- 2. Calcula o total de capítulos necessários para este livro no plano.
     SELECT count(DISTINCT caps.num)
     INTO target_chapters_count
     FROM public.tb_plano_entradas pe,
@@ -126,22 +126,26 @@ BEGIN
     WHERE pe.plano_id = p_plano_id AND pe.id_livro = p_livro_id;
 
     IF target_chapters_count = 0 THEN
-        RETURN;
+        RETURN FALSE; -- Nenhum capítulo definido para este livro no plano.
     END IF;
 
-    -- 3. Count the distinct chapters read by the user for this book in this plan.
+    -- 3. Conta os capítulos distintos lidos pelo usuário para este livro/plano.
     SELECT count(DISTINCT l.capitulo)
     INTO read_chapters_count
     FROM public.tb_leituras l
     WHERE l.usuario_id = p_usuario_id AND l.plano_id = p_plano_id AND l.id_livro = p_livro_id;
 
-    -- 4. If the user has read all required chapters, insert the completion record.
+    -- 4. Se todos os capítulos foram lidos, insere o registro e retorna TRUE.
     IF read_chapters_count >= target_chapters_count THEN
         INSERT INTO public.tb_livros_concluidos (usuario_id, plano_id, id_livro)
         VALUES (p_usuario_id, p_plano_id, p_livro_id);
+        RETURN TRUE; -- Recém-concluído!
     END IF;
+
+    RETURN FALSE; -- Ainda não concluído.
 END;
 $$;
+
 
 
 CREATE OR REPLACE FUNCTION count_unique_readings_for_user(p_usuario_id integer)
