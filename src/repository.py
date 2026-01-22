@@ -15,10 +15,19 @@ class DatabaseRepository:
     """
 
     def __init__(self, client: Client):
-        self._client = client
+        """Inicializa o repositório com o cliente Supabase.
+
+        Args:
+            client: O cliente Supabase para interagir com o banco de dados.
+        """
+        self._client: Client = client
 
     def get_all_users(self) -> list[Usuario]:
-        """Carrega a lista de todos os usuários."""
+        """Carrega a lista de todos os usuários ordenados por nome.
+
+        Returns:
+            Uma lista de objetos Usuario.
+        """
         try:
             response = self._client.table("tb_usuarios").select("id, nome").order("nome").execute()
             if not response.data:
@@ -29,7 +38,16 @@ class DatabaseRepository:
             return []
 
     def get_last_active_plan_name(self, user: Usuario) -> Optional[str]:
-        """Busca o nome do último plano ativo para um usuário."""
+        """Busca o nome do último plano de leitura ativo para um usuário.
+
+        Isso é determinado pelo registro de leitura mais recente do usuário.
+
+        Args:
+            user: O objeto Usuario para o qual buscar o plano.
+
+        Returns:
+            O nome do último plano ativo, ou None se nenhum for encontrado.
+        """
         try:
             response = (
                 self._client.table("tb_leituras")
@@ -52,9 +70,16 @@ class DatabaseRepository:
 
     @st.cache_data(ttl=300)
     def get_all_plans_structured(_self) -> dict[str, pd.DataFrame]:
-        """
-        Carrega e estrutura todos os planos de leitura em um dicionário de DataFrames.
-        O _self é usado para que o Streamlit possa cachear o método de instância.
+        """Carrega e estrutura todos os planos de leitura do banco de dados.
+
+        Os dados são carregados da tabela 'tb_plano_entradas' e processados em
+        um dicionário onde cada chave é o nome de um plano e o valor é um
+        DataFrame do pandas contendo a estrutura desse plano.
+
+        O método é cacheado pelo Streamlit para otimizar o desempenho.
+
+        Returns:
+            Um dicionário de DataFrames, onde cada DataFrame representa um plano de leitura.
         """
         try:
             response = (
@@ -86,7 +111,15 @@ class DatabaseRepository:
             return {}
 
     def get_user_readings(self, user: Usuario, plan_name: str) -> list[Leitura]:
-        """Carrega o histórico de leitura de um usuário para um plano específico."""
+        """Carrega o histórico de capítulos lidos por um usuário em um plano específico.
+
+        Args:
+            user: O usuário cujas leituras serão buscadas.
+            plan_name: O nome do plano de leitura a ser filtrado.
+
+        Returns:
+            Uma lista de objetos Leitura representando os capítulos lidos.
+        """
         try:
             plano_resp = (
                 self._client.table("tb_planos").select("id").eq("nome", plan_name).single().execute()
@@ -112,7 +145,17 @@ class DatabaseRepository:
             return []
 
     def save_reading(self, user: Usuario, plan_name: str, book_name: str, chapter: int) -> None:
-        """Salva um novo registro de leitura, verificando antes se ele já não existe."""
+        """Salva um novo registro de leitura para um usuário.
+
+        Antes de salvar, verifica se o registro já existe para evitar duplicatas.
+        Após salvar, invoca a verificação de conclusão do livro.
+
+        Args:
+            user: O usuário que realizou a leitura.
+            plan_name: O nome do plano de leitura associado.
+            book_name: O nome do livro lido.
+            chapter: O número do capítulo lido.
+        """
         try:
             plano_resp = (
                 self._client.table("tb_planos").select("id").eq("nome", plan_name).single().execute()
@@ -156,10 +199,20 @@ class DatabaseRepository:
 
     def _check_and_save_book_completion(self, usuario_id: int, plano_id: int, livro_id: int):
         """
-        Verifica se um livro foi concluído chamando uma função de banco de dados (RPC).
-        A função de banco de dados 'handle_book_completion_check' contém a lógica
-        e é executada com privilégios elevados (SECURITY DEFINER) para poder inserir
-        na tabela tb_livros_concluidos, resolvendo problemas de RLS.
+        Verifica se um livro foi concluído e salva o registro de conclusão.
+
+        Este método chama a função de banco de dados (RPC) 'handle_book_completion_check'.
+        A função de banco de dados contém a lógica para verificar se todos os capítulos
+        de um livro em um plano foram lidos pelo usuário e, em caso afirmativo,
+        insere um registro na tabela 'tb_livros_concluidos'.
+
+        A RPC é executada com privilégios elevados (SECURITY DEFINER) para contornar
+        as políticas de segurança de linha (RLS) na tabela de conclusões.
+
+        Args:
+            usuario_id: O ID do usuário.
+            plano_id: O ID do plano de leitura.
+            livro_id: O ID do livro a ser verificado.
         """
         try:
             self._client.rpc(
@@ -171,7 +224,11 @@ class DatabaseRepository:
             print(f"AVISO: Erro ao verificar conclusão do livro via RPC: {e}")
 
     def save_question(self, text: str) -> None:
-        """Salva uma nova pergunta anônima."""
+        """Salva uma nova pergunta anônima no mural de dúvidas.
+
+        Args:
+            text: O texto da pergunta a ser salva.
+        """
         try:
             self._client.table("tb_perguntas").insert({"pergunta_texto": text}).execute()
             st.toast("Pergunta enviada!", icon="✅")
@@ -179,7 +236,13 @@ class DatabaseRepository:
             st.error(f"Erro ao salvar pergunta: {e}")
 
     def save_answer(self, question_id: int, user: Usuario, text: str) -> None:
-        """Salva uma nova resposta para uma pergunta."""
+        """Salva uma nova resposta para uma pergunta existente no mural.
+
+        Args:
+            question_id: O ID da pergunta que está sendo respondida.
+            user: O usuário que está enviando a resposta.
+            text: O texto da resposta.
+        """
         try:
             self._client.table("tb_respostas").insert(
                 {"pergunta_id": question_id, "usuario_id": user.id, "resposta_texto": text}
@@ -190,7 +253,14 @@ class DatabaseRepository:
 
     @st.cache_data(ttl=60)
     def get_all_questions_with_answers(_self) -> list[Pergunta]:
-        """Carrega todas as perguntas e suas respectivas respostas."""
+        """Carrega todas as perguntas e suas respectivas respostas do mural.
+
+        As perguntas são retornadas com uma lista aninhada de suas respostas.
+        O método é cacheado pelo Streamlit.
+
+        Returns:
+            Uma lista de objetos Pergunta, cada um contendo suas respostas.
+        """
         try:
             perguntas_resp = (
                 _self._client.table("tb_perguntas").select("*").order("created_at", desc=True).execute()
@@ -230,8 +300,16 @@ class DatabaseRepository:
 
     def get_user_unique_readings_count(self, user_id: int) -> int:
         """
-        Conta o número de capítulos únicos lidos por um usuário via RPC.
-        Requer a função de banco de dados 'count_unique_readings_for_user'.
+        Conta o número de capítulos únicos lidos por um usuário em todos os planos.
+
+        Este método chama a função de banco de dados (RPC) 'count_unique_readings_for_user'
+        para realizar a contagem de forma eficiente no lado do servidor.
+
+        Args:
+            user_id: O ID do usuário a ser consultado.
+
+        Returns:
+            O número total de capítulos únicos lidos pelo usuário.
         """
         try:
             response = self._client.rpc(
@@ -248,7 +326,16 @@ class DatabaseRepository:
 
     @st.cache_data(ttl=60)
     def get_completed_books_dashboard(_self) -> dict[str, set[str]]:
-        """Busca os livros concluídos da tabela consolidada para o dashboard."""
+        """Busca os livros concluídos por todos os usuários.
+
+        Os dados são carregados da tabela 'tb_livros_concluidos' e estruturados
+        em um dicionário para fácil acesso na página de 'Awards'.
+        O método é cacheado pelo Streamlit.
+
+        Returns:
+            Um dicionário onde as chaves são nomes de usuários e os valores são
+            conjuntos (set) com os nomes dos livros concluídos.
+        """
         try:
             response = (
                 _self._client.table("tb_livros_concluidos")
@@ -277,7 +364,14 @@ class DatabaseRepository:
             return {}
 
     def get_all_readings_for_dashboard(self) -> pd.DataFrame:
-        """Busca todas as leituras para o cálculo das métricas do dashboard."""
+        """Busca todos os registros de leitura para o dashboard de progresso geral.
+
+        Retorna um DataFrame contendo o nome do usuário e o plano para cada
+        capítulo lido, que será usado para calcular as métricas do dashboard.
+
+        Returns:
+            Um DataFrame do pandas com as colunas 'Usuario' e 'Plano'.
+        """
         try:
             response = (
                 self._client.table("tb_leituras")

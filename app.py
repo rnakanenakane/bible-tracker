@@ -15,7 +15,12 @@ from src.ui import (
 
 
 def main():
-    """Função principal que orquestra a aplicação Streamlit."""
+    """Função principal que orquestra a aplicação Streamlit.
+
+    Inicializa a configuração da página, gerencia o estado de login do usuário
+    e renderiza a página de login ou a interface principal da aplicação com
+    base no estado da sessão.
+    """
     st.set_page_config(page_title="Rondoninha Church | Leitura", page_icon="✝️", layout="wide")
     apply_styles()
     st.markdown(

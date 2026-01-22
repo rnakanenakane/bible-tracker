@@ -73,7 +73,18 @@ def apply_styles():
 
 
 def render_login_page(users: list[Usuario]) -> Optional[Usuario]:
-    """Renderiza a página de login e retorna o usuário selecionado."""
+    """Renderiza a página de login e gerencia a seleção de usuário.
+
+    Apresenta um selectbox para o usuário escolher seu nome. Após a seleção e
+    o clique no botão "Entrar", o objeto Usuario correspondente é retornado
+    para ser armazenado na sessão.
+
+    Args:
+        users: Uma lista de todos os objetos Usuario cadastrados.
+
+    Returns:
+        O objeto Usuario selecionado se o login for bem-sucedido, caso contrário None.
+    """
     st.header("Bem-vindo! Selecione seu usuário para continuar.")
 
     if not users:
@@ -92,7 +103,18 @@ def render_login_page(users: list[Usuario]) -> Optional[Usuario]:
 
 
 def render_sidebar(user: Usuario) -> tuple[str, bool]:
-    """Renderiza a barra lateral e retorna a página selecionada e se o logout foi clicado."""
+    """Renderiza a barra lateral da aplicação.
+
+    A barra lateral contém uma saudação ao usuário, o menu de navegação principal
+    e o botão de logout.
+
+    Args:
+        user: O objeto Usuario do usuário logado.
+
+    Returns:
+        Uma tupla contendo a string da página selecionada e um booleano
+        indicando se o botão de logout foi clicado.
+    """
     with st.sidebar:
         st.markdown(f"### Olá, {user.nome}!")
         st.divider()
@@ -108,7 +130,19 @@ def render_sidebar(user: Usuario) -> tuple[str, bool]:
 
 
 def _encontrar_proxima_data_nao_lida(df_plano: pd.DataFrame, leituras_usuario: list) -> datetime:
-    """Função auxiliar para encontrar a próxima data de leitura pendente."""
+    """Encontra a próxima data de leitura com capítulos pendentes em um plano.
+
+    Compara os capítulos planejados com os capítulos já lidos pelo usuário
+    para determinar a primeira data no cronograma que ainda não foi completada.
+
+    Args:
+        df_plano: DataFrame do plano de leitura específico.
+        leituras_usuario: Lista de objetos Leitura do usuário.
+
+    Returns:
+        Um objeto datetime correspondente à próxima data com leitura pendente.
+        Retorna a data atual se o plano estiver completo ou vazio.
+    """
     if df_plano.empty:
         return datetime.now(FUSO_BR)
 
@@ -129,7 +163,17 @@ def _encontrar_proxima_data_nao_lida(df_plano: pd.DataFrame, leituras_usuario: l
 
 
 def render_reading_page(user: Usuario, repo: DatabaseRepository, plans: dict[str, pd.DataFrame]):
-    """Renderiza a página 'Minha Leitura'."""
+    """Renderiza a página principal 'Minha Leitura'.
+
+    Esta página permite ao usuário selecionar um plano de leitura, navegar
+    pelas datas e marcar os capítulos como lidos. A lógica gerencia o estado
+    da sessão para lembrar o plano e a data selecionados.
+
+    Args:
+        user: O usuário logado.
+        repo: A instância do repositório de banco de dados.
+        plans: Um dicionário com todos os planos de leitura estruturados.
+    """
     st.header("Meu Plano de Leitura")
 
     if not plans:
@@ -279,7 +323,22 @@ def render_awards_page(user: Usuario, repo: DatabaseRepository):
 def _calculate_dashboard_metrics(
     df_registros: pd.DataFrame, plans: dict[str, pd.DataFrame]
 ) -> tuple[Optional[dict], Optional[pd.DataFrame]]:
-    """Função auxiliar para calcular as métricas do dashboard."""
+    """Calcula as métricas de progresso para o dashboard da comunidade.
+
+    Processa um DataFrame de registros de leitura para gerar estatísticas agregadas
+    (total de leitores, capítulos lidos, etc.) e um DataFrame detalhado com o
+    progresso de cada usuário em cada plano.
+
+    Args:
+        df_registros: DataFrame com todos os registros de leitura.
+        plans: Dicionário com os DataFrames de cada plano para cálculo das metas.
+
+    Returns:
+        Uma tupla contendo:
+        - Um dicionário com as métricas agregadas.
+        - Um DataFrame detalhado com o progresso de cada usuário.
+        Retorna (None, None) se não for possível calcular as métricas.
+    """
     if df_registros is None or df_registros.empty:
         return None, None
 
@@ -323,7 +382,15 @@ def _calculate_dashboard_metrics(
 
 
 def render_dashboard_page(repo: DatabaseRepository, plans: dict[str, pd.DataFrame]):
-    """Renderiza a página 'Progresso Geral'."""
+    """Renderiza a página 'Progresso Geral' (Dashboard da Comunidade).
+
+    Exibe métricas chave sobre o engajamento da comunidade e gráficos de barras
+    que mostram o progresso de cada participante em seus respectivos planos de leitura.
+
+    Args:
+        repo: A instância do repositório de banco de dados.
+        plans: Um dicionário com todos os planos de leitura estruturados.
+    """
     st.markdown("### 🏆 Dashboard da Comunidade")
 
     df_registros = repo.get_all_readings_for_dashboard()
@@ -382,7 +449,15 @@ def render_dashboard_page(repo: DatabaseRepository, plans: dict[str, pd.DataFram
 
 
 def render_qa_page(user: Usuario, repo: DatabaseRepository):
-    """Renderiza a página 'Dúvidas da Comunidade'."""
+    """Renderiza a página 'Dúvidas da Comunidade'.
+
+    Permite que usuários enviem perguntas anonimamente e respondam às perguntas
+    de outros membros da comunidade.
+
+    Args:
+        user: O usuário logado (usado para atribuir autoria às respostas).
+        repo: A instância do repositório de banco de dados.
+    """
     st.markdown("### 💬 Mural de Dúvidas e Respostas")
     st.info("Faça uma pergunta anônima para a comunidade ou ajude a responder as dúvidas existentes.")
 
