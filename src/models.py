@@ -1,4 +1,5 @@
-from datetime import datetime
+from datetime import date, datetime
+from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -36,4 +37,5 @@ class Pergunta(BaseModel):
 class Leitura(BaseModel):
     capitulo: int
     created_at: datetime
+    data_leitura_plano: Optional[date] = None
     livro: Livro

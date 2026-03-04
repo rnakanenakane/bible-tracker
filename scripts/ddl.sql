@@ -34,6 +34,49 @@ CREATE TABLE tb_leituras (
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- =================================================================
+-- ALTERAÇÕES PARA SUPORTE A CAPÍTULOS RECORRENTES (Bug Fix)
+-- =================================================================
+-- Adiciona a data da leitura do plano para identificar unicamente uma tarefa de leitura.
+ALTER TABLE public.tb_leituras ADD COLUMN IF NOT EXISTS data_leitura_plano DATE;
+
+-- NOTA: Se você tiver uma constraint UNIQUE antiga em (usuario_id, plano_id, id_livro, capitulo),
+-- ela deve ser removida para que a nova funcione. O nome da constraint pode variar.
+-- Verifique no seu painel do Supabase em "Database" -> "Tables" -> "tb_leituras" -> "Constraints".
+-- Ex: ALTER TABLE public.tb_leituras DROP CONSTRAINT IF EXISTS nome_da_sua_constraint_antiga;
+
+-- Adiciona a nova constraint de unicidade que inclui a data do plano.
+-- Isso permite que o mesmo capítulo seja lido em dias diferentes no mesmo plano.
+ALTER TABLE public.tb_leituras ADD CONSTRAINT tb_leituras_leitura_unica_por_dia_key UNIQUE (usuario_id, plano_id, id_livro, capitulo, data_leitura_plano);
+
+-- =================================================================
+-- SCRIPT DE MIGRAÇÃO DE DADOS (EXECUTAR UMA VEZ)
+-- =================================================================
+-- Este script preenche a coluna 'data_leitura_plano' para todos os registros
+-- antigos na tabela 'tb_leituras' que estão com o valor NULO.
+-- Isso é necessário para que o progresso antigo dos usuários seja reconhecido
+-- pela nova lógica que suporta capítulos recorrentes.
+
+-- WITH leituras_para_atualizar AS (
+--     -- Para cada leitura antiga, encontra a primeira data em que o capítulo foi planejado.
+--     SELECT
+--         lr.id AS leitura_id,
+--         MIN(pe.data_leitura) AS min_data_leitura
+--     FROM
+--         public.tb_leituras lr
+--     JOIN
+--         public.tb_plano_entradas pe ON lr.plano_id = pe.plano_id AND lr.id_livro = pe.id_livro
+--     JOIN
+--         LATERAL expand_capitulos(pe.capitulos) AS caps(num) ON lr.capitulo = caps.num
+--     WHERE
+--         lr.data_leitura_plano IS NULL -- Processa apenas os registros que precisam de migração
+--     GROUP BY lr.id
+-- )
+-- UPDATE public.tb_leituras l
+-- SET data_leitura_plano = lpa.min_data_leitura
+-- FROM leituras_para_atualizar lpa
+-- WHERE l.id = lpa.leitura_id;
+
 CREATE TABLE tb_perguntas (
     id SERIAL PRIMARY KEY,
     pergunta_texto TEXT NOT NULL,
@@ -164,3 +207,78 @@ BEGIN
     RETURN total_count;
 END;
 $$ LANGUAGE plpgsql;
+
+
+ALTER TABLE public.tb_livros
+ADD COLUMN ordem SMALLINT;
+
+UPDATE public.tb_livros
+SET ordem = CASE nome
+    WHEN 'Gênesis' THEN 1
+    WHEN 'Êxodo' THEN 2
+    WHEN 'Levítico' THEN 3
+    WHEN 'Números' THEN 4
+    WHEN 'Deuteronômio' THEN 5
+    WHEN 'Josué' THEN 6
+    WHEN 'Juízes' THEN 7
+    WHEN 'Rute' THEN 8
+    WHEN '1 Samuel' THEN 9
+    WHEN '2 Samuel' THEN 10
+    WHEN '1 Reis' THEN 11
+    WHEN '2 Reis' THEN 12
+    WHEN '1 Crônicas' THEN 13
+    WHEN '2 Crônicas' THEN 14
+    WHEN 'Esdras' THEN 15
+    WHEN 'Neemias' THEN 16
+    WHEN 'Ester' THEN 17
+    WHEN 'Jó' THEN 18
+    WHEN 'Salmos' THEN 19
+    WHEN 'Provérbios' THEN 20
+    WHEN 'Eclesiastes' THEN 21
+    WHEN 'Cantares' THEN 22
+    WHEN 'Isaías' THEN 23
+    WHEN 'Jeremias' THEN 24
+    WHEN 'Lamentações' THEN 25
+    WHEN 'Ezequiel' THEN 26
+    WHEN 'Daniel' THEN 27
+    WHEN 'Oseias' THEN 28
+    WHEN 'Joel' THEN 29
+    WHEN 'Amós' THEN 30
+    WHEN 'Obadias' THEN 31
+    WHEN 'Jonas' THEN 32
+    WHEN 'Miqueias' THEN 33
+    WHEN 'Naum' THEN 34
+    WHEN 'Habacuque' THEN 35
+    WHEN 'Sofonias' THEN 36
+    WHEN 'Ageu' THEN 37
+    WHEN 'Zacarias' THEN 38
+    WHEN 'Malaquias' THEN 39
+    WHEN 'Mateus' THEN 40
+    WHEN 'Marcos' THEN 41
+    WHEN 'Lucas' THEN 42
+    WHEN 'João' THEN 43
+    WHEN 'Atos' THEN 44
+    WHEN 'Romanos' THEN 45
+    WHEN '1 Coríntios' THEN 46
+    WHEN '2 Coríntios' THEN 47
+    WHEN 'Gálatas' THEN 48
+    WHEN 'Efésios' THEN 49
+    WHEN 'Filipenses' THEN 50
+    WHEN 'Colossenses' THEN 51
+    WHEN '1 Tessalonicenses' THEN 52
+    WHEN '2 Tessalonicenses' THEN 53
+    WHEN '1 Timóteo' THEN 54
+    WHEN '2 Timóteo' THEN 55
+    WHEN 'Tito' THEN 56
+    WHEN 'Filemom' THEN 57
+    WHEN 'Hebreus' THEN 58
+    WHEN 'Tiago' THEN 59
+    WHEN '1 Pedro' THEN 60
+    WHEN '2 Pedro' THEN 61
+    WHEN '1 João' THEN 62
+    WHEN '2 João' THEN 63
+    WHEN '3 João' THEN 64
+    WHEN 'Judas' THEN 65
+    WHEN 'Apocalipse' THEN 66
+END
+WHERE nome IN ('Gênesis', 'Êxodo', 'Levítico', 'Números', 'Deuteronômio', 'Josué', 'Juízes', 'Rute', '1 Samuel', '2 Samuel', '1 Reis', '2 Reis', '1 Crônicas', '2 Crônicas', 'Esdras', 'Neemias', 'Ester', 'Jó', 'Salmos', 'Provérbios', 'Eclesiastes', 'Cantares', 'Isaías', 'Jeremias', 'Lamentações', 'Ezequiel', 'Daniel', 'Oseias', 'Joel', 'Amós', 'Obadias', 'Jonas', 'Miqueias', 'Naum', 'Habacuque', 'Sofonias', 'Ageu', 'Zacarias', 'Malaquias', 'Mateus', 'Marcos', 'Lucas', 'João', 'Atos', 'Romanos', '1 Coríntios', '2 Coríntios', 'Gálatas', 'Efésios', 'Filipenses', 'Colossenses', '1 Tessalonicenses', '2 Tessalonicenses', '1 Timóteo', '2 Timóteo', 'Tito', 'Filemom', 'Hebreus', 'Tiago', '1 Pedro', '2 Pedro', '1 João', '2 João', '3 João', 'Judas', 'Apocalipse');

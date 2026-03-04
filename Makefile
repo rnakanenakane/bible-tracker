@@ -44,7 +44,7 @@ check-deps: init ## Verifica por dependências não utilizadas ou ausentes.
 	$(VENV)/bin/deptry .
 	@echo "--> Verificação de dependências concluída."
 
-run: ## Executa localmente a aplicação
+run: init ## Executa localmente a aplicação
 	@echo "--> Iniciando a aplicação..."
 	$(VENV)/bin/streamlit run app.py
 	@echo "--> Aplicação iniciada."

@@ -161,14 +161,21 @@ def _encontrar_proxima_data_nao_lida(df_plano: pd.DataFrame, leituras_usuario: l
     if not leituras_usuario:
         return df_plano["data"].min()
 
-    lidos_set = {(leitura.livro.nome, leitura.capitulo) for leitura in leituras_usuario}
+    # CORREÇÃO: O conjunto de leituras deve incluir a data para diferenciar capítulos recorrentes.
+    lidos_set = {
+        (leitura.livro.nome, leitura.capitulo, leitura.data_leitura_plano)
+        for leitura in leituras_usuario
+        if leitura.data_leitura_plano
+    }
     df_plano_ordenado = df_plano.sort_values(by="data")
 
     for _, row in df_plano_ordenado.iterrows():
         livro_plano = row["livro"]
+        data_plano = row["data"].date()  # Pega a data da linha do plano
         lista_caps = expandir_capitulos(row["capitulos"])
 
-        if not all((livro_plano, cap) in lidos_set for cap in lista_caps):
+        # CORREÇÃO: A verificação agora usa a tupla (livro, capítulo, data) para encontrar a tarefa exata.
+        if not all((livro_plano, cap, data_plano) in lidos_set for cap in lista_caps):
             return row["data"]
 
     return datetime.now(FUSO_BR)
@@ -223,8 +230,13 @@ def render_reading_page(user: Usuario, repo: DatabaseRepository, plans: dict[str
     df_plano = plans[plano_nome]
 
     if plano_nome != st.session_state.get("plano_anterior"):
-        leituras_usuario = repo.get_user_readings(user, plano_nome)
-        proxima_data = _encontrar_proxima_data_nao_lida(df_plano, leituras_usuario)
+        # Otimização: Passar o ID do plano diretamente para evitar uma consulta extra.
+        # O ID é obtido do DataFrame do plano, que já foi carregado e cacheado.
+        plano_id = df_plano["plano_id"].iloc[0] if not df_plano.empty else None
+        leituras_do_usuario = []
+        if plano_id is not None:
+            leituras_do_usuario = repo.get_user_readings(user, plano_id)
+        proxima_data = _encontrar_proxima_data_nao_lida(df_plano, leituras_do_usuario)
         st.session_state["data_selecionada"] = pd.to_datetime(proxima_data)
         st.session_state["plano_anterior"] = plano_nome
         st.rerun()  # Força o rerun para atualizar a data
@@ -239,8 +251,16 @@ def render_reading_page(user: Usuario, repo: DatabaseRepository, plans: dict[str
         st.session_state["data_selecionada"] = pd.to_datetime(data_input)
 
     leitura_do_dia = df_plano[df_plano["data"].dt.date == st.session_state["data_selecionada"].date()]
-    leituras_usuario = repo.get_user_readings(user, plano_nome)
-    lidos_set = {(leitura.livro.nome, leitura.capitulo) for leitura in leituras_usuario}
+
+    # Otimização: O método get_user_readings agora é cacheado, então esta chamada é eficiente.
+    # Passamos o ID do plano para evitar uma consulta extra para buscar o ID a partir do nome.
+    plano_id = df_plano["plano_id"].iloc[0] if not df_plano.empty else None
+    leituras_usuario = repo.get_user_readings(user, plano_id) if plano_id is not None else []
+    lidos_set = {
+        (leitura.livro.nome, leitura.capitulo, leitura.data_leitura_plano)
+        for leitura in leituras_usuario
+        if leitura.data_leitura_plano
+    }
 
     with c_info:
         if leitura_do_dia.empty:
@@ -248,6 +268,7 @@ def render_reading_page(user: Usuario, repo: DatabaseRepository, plans: dict[str
         else:
             for _, row in leitura_do_dia.iterrows():
                 livro = row["livro"]
+                livro_id = row["livro_id"]
                 caps_str = str(row["capitulos"])
                 lista_caps = expandir_capitulos(caps_str)
 
@@ -258,7 +279,7 @@ def render_reading_page(user: Usuario, repo: DatabaseRepository, plans: dict[str
 
                 cols = st.columns(10)
                 for i, c in enumerate(lista_caps):
-                    ja_leu = (livro, c) in lidos_set
+                    ja_leu = (livro, c, st.session_state["data_selecionada"].date()) in lidos_set
                     label = f"{c} ✅" if ja_leu else f"{c}"
                     if cols[i % 10].button(
                         label,
@@ -266,7 +287,17 @@ def render_reading_page(user: Usuario, repo: DatabaseRepository, plans: dict[str
                         disabled=ja_leu,
                         type="primary" if ja_leu else "secondary",
                     ):
-                        book_completed = repo.save_reading(user, plano_nome, livro, c)
+                        # Otimização: Passa os IDs diretamente para evitar consultas de busca.
+                        if plano_id is not None and livro_id is not None:
+                            data_da_leitura = st.session_state["data_selecionada"].date()
+                            book_completed = repo.save_reading(
+                                user, plano_id, livro_id, c, data_da_leitura
+                            )
+                        else:
+                            st.error(
+                                "Não foi possível salvar a leitura. IDs de plano ou livro não encontrados."
+                            )
+                            book_completed = False
                         if book_completed:
                             st.session_state["book_just_completed"] = livro
                         st.rerun()
