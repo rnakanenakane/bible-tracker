@@ -184,13 +184,15 @@ def _encontrar_proxima_data_nao_lida(df_plano: pd.DataFrame, leituras_usuario: l
 def render_reading_page(user: Usuario, repo: DatabaseRepository, plans: dict[str, pd.DataFrame]):
     """Renderiza a página principal 'Minha Leitura'.
 
-    Esta página permite ao usuário selecionar um plano de leitura, navegar
-    pelas datas e marcar os capítulos como lidos. A lógica gerencia o estado
-    da sessão para lembrar o plano e a data selecionados.
+    Esta página é o coração da aplicação, permitindo ao usuário interagir com
+    seu plano de leitura. Ela gerencia a seleção de planos, a navegação por
+    datas e a marcação de capítulos como lidos. O estado da sessão do Streamlit
+    é utilizado para lembrar as seleções do usuário (plano e data) entre as
+    interações, proporcionando uma experiência fluida.
 
     Args:
         user: O usuário logado.
-        repo: A instância do repositório de banco de dados.
+        repo: A instância do repositório de banco de dados para salvar e carregar dados.
         plans: Um dicionário com todos os planos de leitura estruturados.
     """
     # Exibe a mensagem de comemoração se um livro foi recém-concluído.
@@ -291,7 +293,11 @@ def render_reading_page(user: Usuario, repo: DatabaseRepository, plans: dict[str
                         if plano_id is not None and livro_id is not None:
                             data_da_leitura = st.session_state["data_selecionada"].date()
                             book_completed = repo.save_reading(
-                                user, plano_id, livro_id, c, data_da_leitura
+                                user,
+                                int(plano_id),
+                                int(livro_id),
+                                c,
+                                data_da_leitura,
                             )
                         else:
                             st.error(

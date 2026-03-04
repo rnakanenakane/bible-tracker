@@ -112,8 +112,8 @@ TO authenticated
 USING (true);
 
 
--- Helper function to expand chapter strings like '1-3' into a set of numbers.
--- This is the SQL equivalent of the Python utility function.
+COMMENT ON FUNCTION expand_capitulos(TEXT) IS 'Expande uma string de capítulos (ex: ''5'', ''1-3'', ''119:1-40'') para um conjunto de números de capítulo. Intervalos de versículos são tratados retornando apenas o número do capítulo.';
+
 CREATE OR REPLACE FUNCTION expand_capitulos(str_caps TEXT)
 RETURNS SETOF INT AS $$
 DECLARE
@@ -122,20 +122,16 @@ DECLARE
     chapter_part TEXT;
 BEGIN
     IF str_caps LIKE '%:%' THEN
-        -- Handles verse ranges like '119:1-40'
         chapter_part := split_part(str_caps, ':', 1);
         RETURN QUERY SELECT chapter_part::INT;
     ELSIF str_caps LIKE '%-%' THEN
-        -- Handles ranges like '10-12'
         start_val := split_part(str_caps, '-', 1)::INT;
         end_val := split_part(str_caps, '-', 2)::INT;
         RETURN QUERY SELECT generate_series(start_val, end_val);
     ELSE
-        -- Handles single numbers like '5'
         RETURN QUERY SELECT str_caps::INT;
     END IF;
 EXCEPTION WHEN others THEN
-    -- If conversion fails for any reason, return an empty set.
     RETURN;
 END;
 $$ LANGUAGE plpgsql IMMUTABLE;

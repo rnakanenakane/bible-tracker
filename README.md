@@ -1,10 +1,16 @@
 # ✝️ Bible Tracker: Acompanhamento de Leitura Bíblica
 
-![Streamlit](https://img.shields.io/badge/Feito%20com-Streamlit-red?style=for-the-badge&logo=streamlit)
-![Python](https://img.shields.io/badge/Python-3.11%2B-blue?style=for-the-badge&logo=python)
-![Supabase](https://img.shields.io/badge/Backend-Supabase-green?style=for-the-badge&logo=supabase)
+![Python](https://img.shields.io/badge/Python-3.11+-blue?style=for-the-badge&logo=python) ![Streamlit](https://img.shields.io/badge/Frontend-Streamlit-red?style=for-the-badge&logo=streamlit) ![Supabase](https://img.shields.io/badge/Database-Supabase-green?style=for-the-badge&logo=supabase)
+
+## 📖 Visão Geral
 
 **Bible Tracker** é uma aplicação web moderna e interativa, desenvolvida com Streamlit, para acompanhar o progresso de leitura da Bíblia em comunidade. A ferramenta foi projetada para ser intuitiva, motivadora e promover o engajamento entre os membros, transformando a jornada de leitura em uma experiência compartilhada.
+
+## 📸 Demonstração
+
+*(Aqui você pode adicionar screenshots da aplicação, como a página de leitura, o dashboard e a galeria de insígnias.)*
+
+---
 
 ## ✨ Funcionalidades Principais
 
@@ -55,11 +61,11 @@ cd bible-tracker
 
 ### 3. Configurar o Banco de Dados (Supabase)
 
-1.  **Crie um projeto** na plataforma Supabase.
-2.  **Schema do Banco:** No painel do seu projeto, vá para a seção **SQL Editor**.
-    - Copie e execute o conteúdo do arquivo `scripts/ddl.sql` para criar as tabelas e políticas de segurança (RLS).
-    - **Importante:** Além das tabelas, o script cria as funções `handle_book_completion_check` e `count_unique_readings_for_user`, que são essenciais para a aplicação.
-3.  **Povoamento dos Dados:** Para que a aplicação funcione, é crucial inserir os dados nas tabelas `tb_usuarios`, `tb_planos`, `tb_livros` e, principalmente, `tb_plano_entradas` (que contém a estrutura dos planos de leitura).
+1.  **Crie um novo projeto** na plataforma Supabase.
+2.  **Schema do Banco:** No painel do seu projeto, navegue até a seção **SQL Editor**.
+    - Copie todo o conteúdo do arquivo `scripts/ddl.sql` e execute-o.
+    - **Importante:** Este script é responsável por criar todas as tabelas, relacionamentos, funções (`handle_book_completion_check`, `count_unique_readings_for_user`, `expand_capitulos`), e políticas de segurança (RLS) necessárias para o funcionamento da aplicação.
+3.  **Povoamento dos Dados:** Para que a aplicação seja funcional, é crucial inserir os dados iniciais, especialmente nas tabelas `tb_usuarios`, `tb_planos`, `tb_livros` e, mais importante, `tb_plano_entradas` (que define a estrutura dos planos de leitura).
 
 ### 4. Configurar as Credenciais
 

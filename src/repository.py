@@ -75,14 +75,18 @@ class DatabaseRepository:
     def get_all_plans_structured(_self) -> dict[str, pd.DataFrame]:
         """Carrega e estrutura todos os planos de leitura do banco de dados.
 
-        Os dados são carregados da tabela 'tb_plano_entradas' e processados em
-        um dicionário onde cada chave é o nome de um plano e o valor é um
-        DataFrame do pandas contendo a estrutura desse plano.
+        Este método busca todas as entradas da tabela `tb_plano_entradas`, processa
+        os dados e os agrupa em um dicionário. Cada chave do dicionário é o nome
+        de um plano, e o valor é um DataFrame do pandas contendo a estrutura
+        completa daquele plano, com colunas como 'data', 'livro', 'capitulos',
+        'livro_id', e 'qtd_capitulos'.
 
-        O método é cacheado pelo Streamlit para otimizar o desempenho.
+        O método é cacheado pelo Streamlit para otimizar o desempenho, evitando
+        consultas repetidas ao banco de dados.
 
         Returns:
             Um dicionário de DataFrames, onde cada DataFrame representa um plano de leitura.
+            Retorna um dicionário vazio se nenhum plano for encontrado ou em caso de erro.
         """
         try:
             response = (
@@ -167,9 +171,6 @@ class DatabaseRepository:
             True se o livro foi recém-concluído, False caso contrário.
         """
         try:
-            # Otimização: Em vez de verificar e depois inserir (2 operações),
-            # tentamos inserir diretamente e deixamos o banco de dados lidar com conflitos.
-            # A constraint UNIQUE agora inclui a data do plano para suportar leituras recorrentes.
             insert_data: Dict[str, Any] = {
                 "usuario_id": user.id,
                 "plano_id": plan_id,
@@ -177,6 +178,7 @@ class DatabaseRepository:
                 "capitulo": chapter,
                 "data_leitura_plano": str(reading_date),
             }
+
             response = (
                 self._client.table("tb_leituras")
                 .upsert(
@@ -190,6 +192,8 @@ class DatabaseRepository:
 
             # Se a contagem de linhas inseridas for > 0, a leitura era nova.
             if response.count is not None and response.count > 0:
+                # Invalida o cache das leituras do usuário para forçar a recarga dos dados.
+                self.get_user_readings.clear()
                 return self._check_and_save_book_completion(user.id, plan_id, book_id)
 
         except Exception as e:
