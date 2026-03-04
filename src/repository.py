@@ -281,7 +281,7 @@ class DatabaseRepository:
                 _self._client.table("tb_perguntas")
                 .select("*, respostas:tb_respostas(*, autor:tb_usuarios(id, nome))")
                 .order("created_at", desc=True)
-                .order("created_at", referenced_table="tb_respostas", desc=False)  # type: ignore[call-arg]
+                .order("created_at", foreign_table="tb_respostas", desc=False)
                 .execute()
             )
 
