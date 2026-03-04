@@ -62,7 +62,6 @@ class DatabaseRepository:
                 .single()
                 .execute()
             )
-            # Navegação segura com verificação de tipo para mypy
             if response.data and isinstance(response.data, dict):
                 plano = response.data.get("plano")
                 if isinstance(plano, dict):
@@ -122,7 +121,7 @@ class DatabaseRepository:
             return todos_planos
         except Exception as e:
             logger.error(f"Erro ao carregar planos do banco de dados: {e}", exc_info=True)
-            st.error(f"Erro ao carregar planos do banco de dados: {e}")  # Manter na UI
+            st.error(f"Erro ao carregar planos do banco de dados: {e}")
             return {}
 
     @st.cache_data(ttl=60)
@@ -275,8 +274,6 @@ class DatabaseRepository:
             Uma lista de objetos Pergunta, cada um contendo suas respostas.
         """
         try:
-            # Otimização: Busca perguntas e suas respostas aninhadas em uma única chamada.
-            # Isso evita a lógica de junção manual em Python e é mais eficiente.
             response = (
                 _self._client.table("tb_perguntas")
                 .select("*, respostas:tb_respostas(*, autor:tb_usuarios(id, nome))")
@@ -288,7 +285,6 @@ class DatabaseRepository:
             if not response.data:
                 return []
 
-            # A resposta do Supabase já vem estruturada, facilitando a instanciação dos modelos Pydantic.
             perguntas = [Pergunta(**p_data) for p_data in response.data if isinstance(p_data, dict)]
             return perguntas
 
@@ -389,3 +385,47 @@ class DatabaseRepository:
             logger.warning(f"Não foi possível carregar os registros para o dashboard: {e}")
             st.warning(f"Não foi possível carregar os registros para o dashboard: {e}")
             return pd.DataFrame()
+
+    @st.cache_data(ttl=3600)
+    def get_total_bible_chapters(_self) -> int:
+        """Calcula o número total de capítulos na Bíblia a partir do banco de dados.
+
+        Returns:
+            O número total de capítulos em todos os livros.
+        """
+        try:
+            # Usamos a função de agregação 'sum' do PostgREST
+            response = (
+                _self._client.table("tb_livros").select("chapters", count=CountMethod.exact).execute()
+            )
+            if response.data:
+                return sum(
+                    item["chapters"]
+                    for item in response.data
+                    if isinstance(item, dict) and "chapters" in item and item["chapters"] is not None
+                )
+        except Exception as e:
+            logger.warning(f"Não foi possível calcular o total de capítulos da Bíblia: {e}")
+        return 0
+
+    @st.cache_data(ttl=3600)
+    def get_book_order_map(_self) -> dict[str, int]:
+        """Cria um mapa de nome do livro para sua ordem canônica.
+
+        Returns:
+            Um dicionário mapeando o nome de cada livro para seu número de ordem.
+        """
+        try:
+            response = _self._client.table("tb_livros").select("nome, ordem").execute()
+            if response.data:
+                return {
+                    item["nome"]: item["ordem"]
+                    for item in response.data
+                    if isinstance(item, dict)
+                    and "nome" in item
+                    and "ordem" in item
+                    and item["ordem"] is not None
+                }
+        except Exception as e:
+            logger.warning(f"Não foi possível carregar o mapa de ordem dos livros: {e}")
+        return {}

@@ -8,12 +8,7 @@ import streamlit as st
 from src.config import FUSO_BR
 from src.models import Usuario
 from src.repository import DatabaseRepository
-from src.utils import (
-    BIBLE_BOOKS_DATA,
-    expandir_capitulos,
-    get_total_bible_chapters,
-    load_book_images_map,
-)
+from src.utils import expandir_capitulos, load_book_images_map
 
 
 def apply_styles():
@@ -161,7 +156,6 @@ def _encontrar_proxima_data_nao_lida(df_plano: pd.DataFrame, leituras_usuario: l
     if not leituras_usuario:
         return df_plano["data"].min()
 
-    # CORREÇÃO: O conjunto de leituras deve incluir a data para diferenciar capítulos recorrentes.
     lidos_set = {
         (leitura.livro.nome, leitura.capitulo, leitura.data_leitura_plano)
         for leitura in leituras_usuario
@@ -174,7 +168,6 @@ def _encontrar_proxima_data_nao_lida(df_plano: pd.DataFrame, leituras_usuario: l
         data_plano = row["data"].date()  # Pega a data da linha do plano
         lista_caps = expandir_capitulos(row["capitulos"])
 
-        # CORREÇÃO: A verificação agora usa a tupla (livro, capítulo, data) para encontrar a tarefa exata.
         if not all((livro_plano, cap, data_plano) in lidos_set for cap in lista_caps):
             return row["data"]
 
@@ -232,8 +225,6 @@ def render_reading_page(user: Usuario, repo: DatabaseRepository, plans: dict[str
     df_plano = plans[plano_nome]
 
     if plano_nome != st.session_state.get("plano_anterior"):
-        # Otimização: Passar o ID do plano diretamente para evitar uma consulta extra.
-        # O ID é obtido do DataFrame do plano, que já foi carregado e cacheado.
         plano_id = df_plano["plano_id"].iloc[0] if not df_plano.empty else None
         leituras_do_usuario = []
         if plano_id is not None:
@@ -254,8 +245,6 @@ def render_reading_page(user: Usuario, repo: DatabaseRepository, plans: dict[str
 
     leitura_do_dia = df_plano[df_plano["data"].dt.date == st.session_state["data_selecionada"].date()]
 
-    # Otimização: O método get_user_readings agora é cacheado, então esta chamada é eficiente.
-    # Passamos o ID do plano para evitar uma consulta extra para buscar o ID a partir do nome.
     plano_id = df_plano["plano_id"].iloc[0] if not df_plano.empty else None
     leituras_usuario = repo.get_user_readings(user, plano_id) if plano_id is not None else []
     lidos_set = {
@@ -289,7 +278,6 @@ def render_reading_page(user: Usuario, repo: DatabaseRepository, plans: dict[str
                         disabled=ja_leu,
                         type="primary" if ja_leu else "secondary",
                     ):
-                        # Otimização: Passa os IDs diretamente para evitar consultas de busca.
                         if plano_id is not None and livro_id is not None:
                             data_da_leitura = st.session_state["data_selecionada"].date()
                             book_completed = repo.save_reading(
@@ -309,13 +297,11 @@ def render_reading_page(user: Usuario, repo: DatabaseRepository, plans: dict[str
                         st.rerun()
 
 
-def _render_user_seals(books: set[str], book_images_map: dict[str, str]):
-    """Helper para renderizar os selos de um usuário em uma grade."""
+def _render_user_seals(repo: DatabaseRepository, books: set[str], book_images_map: dict[str, str]):
+    """Renderiza os selos de um usuário em uma grade, ordenados canonicamente."""
     seals_per_row = 6  # Menos colunas = imagens maiores
-    sorted_books = sorted(
-        list(books),
-        key=lambda book_name: BIBLE_BOOKS_DATA.get(book_name, {"order": 999})["order"],
-    )
+    book_order_map = repo.get_book_order_map()
+    sorted_books = sorted(list(books), key=lambda book_name: book_order_map.get(book_name, 999))
 
     book_chunks = [
         sorted_books[i : i + seals_per_row] for i in range(0, len(sorted_books), seals_per_row)
@@ -347,7 +333,7 @@ def render_awards_page(user: Usuario, repo: DatabaseRepository):
         st.markdown("### 🌟 Minhas Insígnias")
 
         # Adiciona o cálculo e exibição do progresso geral de leitura da Bíblia
-        total_bible_chapters = get_total_bible_chapters()
+        total_bible_chapters = repo.get_total_bible_chapters()
         user_chapters_read = repo.get_user_unique_readings_count(user.id)
 
         if total_bible_chapters > 0:
@@ -362,7 +348,7 @@ def render_awards_page(user: Usuario, repo: DatabaseRepository):
         my_books = completed_books.get(user.nome)
 
         if my_books:
-            _render_user_seals(my_books, book_images_map)
+            _render_user_seals(repo, my_books, book_images_map)
         else:
             st.info(
                 "Você ainda não possui insígnias. Conclua a leitura de um livro para ganhar a sua primeira!"
@@ -383,7 +369,7 @@ def render_awards_page(user: Usuario, repo: DatabaseRepository):
         for other_user_name in sorted(other_users_completed.keys()):
             books = other_users_completed[other_user_name]
             st.markdown(f"**{other_user_name}:**")
-            _render_user_seals(books, book_images_map)
+            _render_user_seals(repo, books, book_images_map)
             st.markdown("<br>", unsafe_allow_html=True)
     finally:
         st.markdown("</div>", unsafe_allow_html=True)  # Fecha a div personalizada

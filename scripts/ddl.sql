@@ -211,75 +211,30 @@ $$ LANGUAGE plpgsql;
 
 
 ALTER TABLE public.tb_livros
-ADD COLUMN ordem SMALLINT;
+ADD COLUMN IF NOT EXISTS ordem SMALLINT,
+ADD COLUMN IF NOT EXISTS chapters SMALLINT;
 
 UPDATE public.tb_livros
-SET ordem = CASE nome
-    WHEN 'Gênesis' THEN 1
-    WHEN 'Êxodo' THEN 2
-    WHEN 'Levítico' THEN 3
-    WHEN 'Números' THEN 4
-    WHEN 'Deuteronômio' THEN 5
-    WHEN 'Josué' THEN 6
-    WHEN 'Juízes' THEN 7
-    WHEN 'Rute' THEN 8
-    WHEN '1 Samuel' THEN 9
-    WHEN '2 Samuel' THEN 10
-    WHEN '1 Reis' THEN 11
-    WHEN '2 Reis' THEN 12
-    WHEN '1 Crônicas' THEN 13
-    WHEN '2 Crônicas' THEN 14
-    WHEN 'Esdras' THEN 15
-    WHEN 'Neemias' THEN 16
-    WHEN 'Ester' THEN 17
-    WHEN 'Jó' THEN 18
-    WHEN 'Salmos' THEN 19
-    WHEN 'Provérbios' THEN 20
-    WHEN 'Eclesiastes' THEN 21
-    WHEN 'Cantares' THEN 22
-    WHEN 'Isaías' THEN 23
-    WHEN 'Jeremias' THEN 24
-    WHEN 'Lamentações' THEN 25
-    WHEN 'Ezequiel' THEN 26
-    WHEN 'Daniel' THEN 27
-    WHEN 'Oseias' THEN 28
-    WHEN 'Joel' THEN 29
-    WHEN 'Amós' THEN 30
-    WHEN 'Obadias' THEN 31
-    WHEN 'Jonas' THEN 32
-    WHEN 'Miqueias' THEN 33
-    WHEN 'Naum' THEN 34
-    WHEN 'Habacuque' THEN 35
-    WHEN 'Sofonias' THEN 36
-    WHEN 'Ageu' THEN 37
-    WHEN 'Zacarias' THEN 38
-    WHEN 'Malaquias' THEN 39
-    WHEN 'Mateus' THEN 40
-    WHEN 'Marcos' THEN 41
-    WHEN 'Lucas' THEN 42
-    WHEN 'João' THEN 43
-    WHEN 'Atos' THEN 44
-    WHEN 'Romanos' THEN 45
-    WHEN '1 Coríntios' THEN 46
-    WHEN '2 Coríntios' THEN 47
-    WHEN 'Gálatas' THEN 48
-    WHEN 'Efésios' THEN 49
-    WHEN 'Filipenses' THEN 50
-    WHEN 'Colossenses' THEN 51
-    WHEN '1 Tessalonicenses' THEN 52
-    WHEN '2 Tessalonicenses' THEN 53
-    WHEN '1 Timóteo' THEN 54
-    WHEN '2 Timóteo' THEN 55
-    WHEN 'Tito' THEN 56
-    WHEN 'Filemom' THEN 57
-    WHEN 'Hebreus' THEN 58
-    WHEN 'Tiago' THEN 59
-    WHEN '1 Pedro' THEN 60
-    WHEN '2 Pedro' THEN 61
-    WHEN '1 João' THEN 62
-    WHEN '2 João' THEN 63
-    WHEN '3 João' THEN 64
-    WHEN 'Judas' THEN 65
-    WHEN 'Apocalipse' THEN 66
-END
-WHERE nome IN ('Gênesis', 'Êxodo', 'Levítico', 'Números', 'Deuteronômio', 'Josué', 'Juízes', 'Rute', '1 Samuel', '2 Samuel', '1 Reis', '2 Reis', '1 Crônicas', '2 Crônicas', 'Esdras', 'Neemias', 'Ester', 'Jó', 'Salmos', 'Provérbios', 'Eclesiastes', 'Cantares', 'Isaías', 'Jeremias', 'Lamentações', 'Ezequiel', 'Daniel', 'Oseias', 'Joel', 'Amós', 'Obadias', 'Jonas', 'Miqueias', 'Naum', 'Habacuque', 'Sofonias', 'Ageu', 'Zacarias', 'Malaquias', 'Mateus', 'Marcos', 'Lucas', 'João', 'Atos', 'Romanos', '1 Coríntios', '2 Coríntios', 'Gálatas', 'Efésios', 'Filipenses', 'Colossenses', '1 Tessalonicenses', '2 Tessalonicenses', '1 Timóteo', '2 Timóteo', 'Tito', 'Filemom', 'Hebreus', 'Tiago', '1 Pedro', '2 Pedro', '1 João', '2 João', '3 João', 'Judas', 'Apocalipse');
+SET 
+    ordem = v.ordem,
+    chapters = v.chapters
+FROM (VALUES
+    ('Gênesis', 1, 50), ('Êxodo', 2, 40), ('Levítico', 3, 27), ('Números', 4, 36),
+    ('Deuteronômio', 5, 34), ('Josué', 6, 24), ('Juízes', 7, 21), ('Rute', 8, 4),
+    ('1 Samuel', 9, 31), ('2 Samuel', 10, 24), ('1 Reis', 11, 22), ('2 Reis', 12, 25),
+    ('1 Crônicas', 13, 29), ('2 Crônicas', 14, 36), ('Esdras', 15, 10), ('Neemias', 16, 13),
+    ('Ester', 17, 10), ('Jó', 18, 42), ('Salmos', 19, 150), ('Provérbios', 20, 31),
+    ('Eclesiastes', 21, 12), ('Cantares', 22, 8), ('Isaías', 23, 66), ('Jeremias', 24, 52),
+    ('Lamentações', 25, 5), ('Ezequiel', 26, 48), ('Daniel', 27, 12), ('Oseias', 28, 14),
+    ('Joel', 29, 3), ('Amós', 30, 9), ('Obadias', 31, 1), ('Jonas', 32, 4),
+    ('Miqueias', 33, 7), ('Naum', 34, 3), ('Habacuque', 35, 3), ('Sofonias', 36, 3),
+    ('Ageu', 37, 2), ('Zacarias', 38, 14), ('Malaquias', 39, 4),
+    ('Mateus', 40, 28), ('Marcos', 41, 16), ('Lucas', 42, 24), ('João', 43, 21),
+    ('Atos', 44, 28), ('Romanos', 45, 16), ('1 Coríntios', 46, 16), ('2 Coríntios', 47, 13),
+    ('Gálatas', 48, 6), ('Efésios', 49, 6), ('Filipenses', 50, 4), ('Colossenses', 51, 4),
+    ('1 Tessalonicenses', 52, 5), ('2 Tessalonicenses', 53, 3), ('1 Timóteo', 54, 6),
+    ('2 Timóteo', 55, 4), ('Tito', 56, 3), ('Filemom', 57, 1), ('Hebreus', 58, 13),
+    ('Tiago', 59, 5), ('1 Pedro', 60, 5), ('2 Pedro', 61, 3), ('1 João', 62, 5),
+    ('2 João', 63, 1), ('3 João', 64, 1), ('Judas', 65, 1), ('Apocalipse', 66, 22)
+) AS v(nome, ordem, chapters)
+WHERE tb_livros.nome = v.nome;
