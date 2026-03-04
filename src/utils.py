@@ -18,12 +18,21 @@ def expandir_capitulos(str_caps: str) -> list[int]:
         Uma lista de inteiros representando os capítulos expandidos.
     """
     str_caps = str(str_caps).strip()
-    if "-" in str_caps:
+    # Adicionado para lidar com intervalos de versículos como '119:1-40'
+    if ":" in str_caps:
+        try:
+            chapter_part = str_caps.split(":")[0]
+            return [int(chapter_part)]
+        except (ValueError, TypeError):
+            return []
+    # Lida com intervalos de capítulos como '1-3'
+    elif "-" in str_caps:
         try:
             inicio, fim = map(int, str_caps.split("-"))
             return list(range(inicio, fim + 1))
         except (ValueError, TypeError):
             return []
+    # Lida com um único capítulo como '5'
     else:
         try:
             return [int(str_caps)]

@@ -119,8 +119,13 @@ RETURNS SETOF INT AS $$
 DECLARE
     start_val INT;
     end_val INT;
+    chapter_part TEXT;
 BEGIN
-    IF str_caps LIKE '%-%' THEN
+    IF str_caps LIKE '%:%' THEN
+        -- Handles verse ranges like '119:1-40'
+        chapter_part := split_part(str_caps, ':', 1);
+        RETURN QUERY SELECT chapter_part::INT;
+    ELSIF str_caps LIKE '%-%' THEN
         -- Handles ranges like '10-12'
         start_val := split_part(str_caps, '-', 1)::INT;
         end_val := split_part(str_caps, '-', 2)::INT;
