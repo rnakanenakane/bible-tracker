@@ -1,4 +1,5 @@
-from datetime import datetime
+import os
+from datetime import date, datetime, timedelta
 from typing import Optional
 
 import altair as alt
@@ -126,7 +127,7 @@ def render_sidebar(user: Usuario) -> tuple[str, bool]:
         st.divider()
         pagina = st.radio(
             "Navegar",
-            ["Minha Leitura", "Progresso Geral", "Awards", "Dúvidas da Comunidade"],
+            ["Minha Leitura", "Meu Perfil", "Progresso Geral", "Awards", "Dúvidas da Comunidade"],
             label_visibility="collapsed",
             key="page_selection",
         )
@@ -134,6 +135,94 @@ def render_sidebar(user: Usuario) -> tuple[str, bool]:
         logout_clicked = st.button("Sair")
         st.caption("Rondoninha Church © 2026")
     return pagina, logout_clicked
+
+
+def _calculate_reading_streak(reading_dates: list[date]) -> int:
+    """Calcula a sequência atual de dias consecutivos de leitura."""
+    if not reading_dates:
+        return 0
+
+    # Garante que as datas são únicas e ordenadas
+    unique_dates = sorted(list(set(reading_dates)))
+
+    today = datetime.now(FUSO_BR).date()
+
+    # Filtra apenas as datas até hoje
+    relevant_dates = [d for d in unique_dates if d <= today]
+    if not relevant_dates:
+        return 0
+
+    # Começa a contagem a partir da data mais recente
+    last_date = relevant_dates[-1]
+
+    # Se a última leitura não foi hoje ou ontem, a sequência é 0
+    if (today - last_date).days > 1:
+        return 0
+
+    streak = 1
+    # Itera para trás a partir da penúltima data relevante
+    for i in range(len(relevant_dates) - 2, -1, -1):
+        expected_date = last_date - timedelta(days=1)
+        if relevant_dates[i] == expected_date:
+            streak += 1
+            last_date = relevant_dates[i]
+        else:
+            # A sequência foi quebrada
+            break
+
+    return streak
+
+
+def render_profile_page(user: Usuario, repo: DatabaseRepository):
+    """Renderiza a página 'Meu Perfil' com estatísticas de leitura do usuário."""
+    st.markdown(f"### 📊 Perfil de Leitura de {user.nome}")
+
+    # --- Carregamento de Dados ---
+    total_chapters = repo.get_user_unique_readings_count(user.id)
+    completed_books_data = repo.get_completed_books_dashboard()
+    num_completed_books = len(completed_books_data.get(user.nome, set()))
+    reading_dates = repo.get_reading_history_for_profile(user.id)
+
+    # --- Cálculo da Sequência de Leitura ---
+    streak = _calculate_reading_streak(reading_dates)
+
+    # --- Exibição das Métricas Principais ---
+    c1, c2, c3 = st.columns(3)
+    c1.metric("📚 Capítulos Únicos Lidos", total_chapters)
+    c2.metric("🏆 Livros Concluídos", num_completed_books)
+    c3.metric("🔥 Sequência de Leitura", f"{streak} dias")
+
+    st.divider()
+
+    # --- Gráfico de Ritmo de Leitura ---
+    st.markdown("#### Ritmo de Leitura (Capítulos por Mês)")
+
+    if not reading_dates:
+        st.info("Você ainda não registrou nenhuma leitura para exibir o ritmo.")
+        return
+
+    df_leituras = pd.DataFrame({"data": reading_dates})
+    df_leituras["data"] = pd.to_datetime(df_leituras["data"])
+
+    leituras_por_mes = (
+        df_leituras.groupby(pd.Grouper(key="data", freq="ME")).size().reset_index(name="capitulos_lidos")
+    )
+    leituras_por_mes["mes"] = leituras_por_mes["data"].dt.strftime("%b/%Y")
+
+    chart = (
+        alt.Chart(leituras_por_mes)
+        .mark_bar(cornerRadiusTopLeft=5, cornerRadiusTopRight=5, opacity=0.8)
+        .encode(
+            x=alt.X("mes:O", title="Mês", sort=None),
+            y=alt.Y("capitulos_lidos:Q", title="Capítulos Lidos"),
+            tooltip=[
+                alt.Tooltip("mes", title="Mês"),
+                alt.Tooltip("capitulos_lidos", title="Capítulos Lidos"),
+            ],
+        )
+        .properties(title="Seu ritmo de leitura mensal", width="container")
+    )
+    st.altair_chart(chart)
 
 
 def render_reading_page(user: Usuario, repo: DatabaseRepository, plan_names: list[str]):
@@ -274,7 +363,7 @@ def _render_user_seals(repo: DatabaseRepository, books: set[str], book_images_ma
         for i, book_name in enumerate(chunk):
             with cols[i]:
                 image_path = book_images_map.get(book_name)
-                if image_path:
+                if image_path and os.path.exists(image_path):
                     st.image(image_path)
                 else:
                     # Fallback para o nome do livro se a imagem não for encontrada

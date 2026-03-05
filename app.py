@@ -8,6 +8,7 @@ from src.ui import (
     render_awards_page,
     render_dashboard_page,
     render_login_page,
+    render_profile_page,
     render_qa_page,
     render_reading_page,
     render_sidebar,
@@ -57,6 +58,8 @@ def main():
 
         if page == "Minha Leitura":
             render_reading_page(current_user, repo, plan_names)
+        elif page == "Meu Perfil":
+            render_profile_page(current_user, repo)
         elif page == "Progresso Geral":
             render_dashboard_page(repo)
         elif page == "Awards":

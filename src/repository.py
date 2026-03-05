@@ -498,3 +498,35 @@ class DatabaseRepository:
         except Exception as e:
             logger.warning(f"Não foi possível carregar o mapa de imagens dos livros: {e}")
         return {}
+
+    @st.cache_data(ttl=60)
+    def get_reading_history_for_profile(_self, user_id: int) -> list[date]:
+        """Busca o histórico de datas de leitura de um usuário para a página de perfil.
+
+        Retorna uma lista de todas as datas em que o usuário registrou uma leitura.
+
+        Args:
+            user_id: O ID do usuário.
+
+        Returns:
+            Uma lista de objetos `date`.
+        """
+        try:
+            response = (
+                _self._client.table("tb_leituras")
+                .select("data_leitura_plano")
+                .eq("usuario_id", user_id)
+                .not_.is_("data_leitura_plano", "null")
+                .execute()
+            )
+            if response.data:
+                return [
+                    datetime.strptime(item["data_leitura_plano"], "%Y-%m-%d").date()
+                    for item in response.data
+                    if isinstance(item, dict) and item.get("data_leitura_plano")
+                ]
+        except Exception as e:
+            logger.warning(
+                f"Não foi possível carregar o histórico de leituras para o perfil do usuário {user_id}: {e}"
+            )
+        return []
