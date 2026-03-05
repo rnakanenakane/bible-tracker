@@ -1,5 +1,5 @@
 import logging
-from datetime import date
+from datetime import date, datetime
 from typing import Any, Dict, Optional
 
 import pandas as pd
@@ -7,6 +7,7 @@ import streamlit as st
 from postgrest import CountMethod
 from supabase import Client
 
+from src.config import FUSO_BR
 from src.models import Leitura, Pergunta, Usuario
 from src.utils import expandir_capitulos
 
@@ -140,6 +141,45 @@ class DatabaseRepository:
             logger.error(f"Erro ao carregar o plano '{plan_name}': {e}", exc_info=True)
             st.error(f"Erro ao carregar o plano '{plan_name}'.")
             return None
+
+    def find_next_unread_date(self, user: Usuario, df_plano: pd.DataFrame) -> datetime:
+        """Encontra a próxima data de leitura com capítulos pendentes em um plano.
+
+        Compara os capítulos planejados com os capítulos já lidos pelo usuário
+        para determinar a primeira data no cronograma que ainda não foi completada.
+
+        Args:
+            user: O usuário para o qual a verificação será feita.
+            df_plano: DataFrame do plano de leitura específico.
+
+        Returns:
+            Um objeto datetime correspondente à próxima data com leitura pendente.
+            Retorna a data atual se o plano estiver completo ou vazio.
+        """
+        if df_plano.empty:
+            return datetime.now(FUSO_BR)
+
+        plano_id = df_plano["plano_id"].iloc[0]
+        leituras_usuario = self.get_user_readings(user, int(plano_id))
+
+        if not leituras_usuario:
+            return df_plano["data"].min()
+
+        lidos_set = {
+            (leitura.livro.nome, leitura.capitulo, leitura.data_leitura_plano)
+            for leitura in leituras_usuario
+            if leitura.data_leitura_plano
+        }
+        df_plano_ordenado = df_plano.sort_values(by="data")
+
+        for _, row in df_plano_ordenado.iterrows():
+            livro_plano = row["livro"]
+            data_plano = row["data"].date()
+            lista_caps = expandir_capitulos(str(row["capitulos"]))
+            if not all((livro_plano, cap, data_plano) in lidos_set for cap in lista_caps):
+                return row["data"]
+
+        return datetime.now(FUSO_BR)
 
     @st.cache_data(ttl=60)
     def get_user_readings(_self, user: Usuario, plan_id: int) -> list[Leitura]:

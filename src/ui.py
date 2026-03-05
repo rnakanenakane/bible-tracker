@@ -136,44 +136,6 @@ def render_sidebar(user: Usuario) -> tuple[str, bool]:
     return pagina, logout_clicked
 
 
-def _encontrar_proxima_data_nao_lida(df_plano: pd.DataFrame, leituras_usuario: list) -> datetime:
-    """Encontra a próxima data de leitura com capítulos pendentes em um plano.
-
-    Compara os capítulos planejados com os capítulos já lidos pelo usuário
-    para determinar a primeira data no cronograma que ainda não foi completada.
-
-    Args:
-        df_plano: DataFrame do plano de leitura específico.
-        leituras_usuario: Lista de objetos Leitura do usuário.
-
-    Returns:
-        Um objeto datetime correspondente à próxima data com leitura pendente.
-        Retorna a data atual se o plano estiver completo ou vazio.
-    """
-    if df_plano.empty:
-        return datetime.now(FUSO_BR)
-
-    if not leituras_usuario:
-        return df_plano["data"].min()
-
-    lidos_set = {
-        (leitura.livro.nome, leitura.capitulo, leitura.data_leitura_plano)
-        for leitura in leituras_usuario
-        if leitura.data_leitura_plano
-    }
-    df_plano_ordenado = df_plano.sort_values(by="data")
-
-    for _, row in df_plano_ordenado.iterrows():
-        livro_plano = row["livro"]
-        data_plano = row["data"].date()  # Pega a data da linha do plano
-        lista_caps = expandir_capitulos(row["capitulos"])
-
-        if not all((livro_plano, cap, data_plano) in lidos_set for cap in lista_caps):
-            return row["data"]
-
-    return datetime.now(FUSO_BR)
-
-
 def render_reading_page(user: Usuario, repo: DatabaseRepository, plan_names: list[str]):
     """Renderiza a página principal 'Minha Leitura'.
 
@@ -229,11 +191,7 @@ def render_reading_page(user: Usuario, repo: DatabaseRepository, plan_names: lis
         st.stop()
 
     if plano_nome != st.session_state.get("plano_anterior"):
-        plano_id = df_plano["plano_id"].iloc[0] if not df_plano.empty else None
-        leituras_do_usuario = []
-        if plano_id is not None:
-            leituras_do_usuario = repo.get_user_readings(user, plano_id)
-        proxima_data = _encontrar_proxima_data_nao_lida(df_plano, leituras_do_usuario)
+        proxima_data = repo.find_next_unread_date(user, df_plano)
         st.session_state["data_selecionada"] = pd.to_datetime(proxima_data)
         st.session_state["plano_anterior"] = plano_nome
         st.rerun()  # Força o rerun para atualizar a data
