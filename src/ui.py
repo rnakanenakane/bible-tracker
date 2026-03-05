@@ -8,7 +8,7 @@ import streamlit as st
 from src.config import FUSO_BR
 from src.models import Usuario
 from src.repository import DatabaseRepository
-from src.utils import expandir_capitulos, load_book_images_map
+from src.utils import expandir_capitulos
 
 
 def apply_styles():
@@ -327,7 +327,7 @@ def render_awards_page(user: Usuario, repo: DatabaseRepository):
         st.markdown("# 🏅 Insígnias de Conclusão")
 
         completed_books = repo.get_completed_books_dashboard()
-        book_images_map = load_book_images_map()
+        book_images_map = repo.get_book_images_map()
 
         # --- Seção do Usuário Logado ---
         st.markdown("### 🌟 Minhas Insígnias")

@@ -212,29 +212,31 @@ $$ LANGUAGE plpgsql;
 
 ALTER TABLE public.tb_livros
 ADD COLUMN IF NOT EXISTS ordem SMALLINT,
-ADD COLUMN IF NOT EXISTS chapters SMALLINT;
+ADD COLUMN IF NOT EXISTS chapters SMALLINT,
+ADD COLUMN IF NOT EXISTS image_path TEXT;
 
 UPDATE public.tb_livros
 SET 
     ordem = v.ordem,
-    chapters = v.chapters
+    chapters = v.chapters,
+    image_path = v.image_path
 FROM (VALUES
-    ('Gênesis', 1, 50), ('Êxodo', 2, 40), ('Levítico', 3, 27), ('Números', 4, 36),
-    ('Deuteronômio', 5, 34), ('Josué', 6, 24), ('Juízes', 7, 21), ('Rute', 8, 4),
-    ('1 Samuel', 9, 31), ('2 Samuel', 10, 24), ('1 Reis', 11, 22), ('2 Reis', 12, 25),
-    ('1 Crônicas', 13, 29), ('2 Crônicas', 14, 36), ('Esdras', 15, 10), ('Neemias', 16, 13),
-    ('Ester', 17, 10), ('Jó', 18, 42), ('Salmos', 19, 150), ('Provérbios', 20, 31),
-    ('Eclesiastes', 21, 12), ('Cantares', 22, 8), ('Isaías', 23, 66), ('Jeremias', 24, 52),
-    ('Lamentações', 25, 5), ('Ezequiel', 26, 48), ('Daniel', 27, 12), ('Oseias', 28, 14),
-    ('Joel', 29, 3), ('Amós', 30, 9), ('Obadias', 31, 1), ('Jonas', 32, 4),
-    ('Miqueias', 33, 7), ('Naum', 34, 3), ('Habacuque', 35, 3), ('Sofonias', 36, 3),
-    ('Ageu', 37, 2), ('Zacarias', 38, 14), ('Malaquias', 39, 4),
-    ('Mateus', 40, 28), ('Marcos', 41, 16), ('Lucas', 42, 24), ('João', 43, 21),
-    ('Atos', 44, 28), ('Romanos', 45, 16), ('1 Coríntios', 46, 16), ('2 Coríntios', 47, 13),
-    ('Gálatas', 48, 6), ('Efésios', 49, 6), ('Filipenses', 50, 4), ('Colossenses', 51, 4),
-    ('1 Tessalonicenses', 52, 5), ('2 Tessalonicenses', 53, 3), ('1 Timóteo', 54, 6),
-    ('2 Timóteo', 55, 4), ('Tito', 56, 3), ('Filemom', 57, 1), ('Hebreus', 58, 13),
-    ('Tiago', 59, 5), ('1 Pedro', 60, 5), ('2 Pedro', 61, 3), ('1 João', 62, 5),
-    ('2 João', 63, 1), ('3 João', 64, 1), ('Judas', 65, 1), ('Apocalipse', 66, 22)
-) AS v(nome, ordem, chapters)
+    ('Gênesis', 1, 50, 'media/28.png'), ('Êxodo', 2, 40, 'media/29.png'), ('Levítico', 3, 27, 'media/30.png'), ('Números', 4, 36, 'media/31.png'),
+    ('Deuteronômio', 5, 34, 'media/32.png'), ('Josué', 6, 24, 'media/33.png'), ('Juízes', 7, 21, 'media/34.png'), ('Rute', 8, 4, 'media/35.png'),
+    ('1 Samuel', 9, 31, 'media/36.png'), ('2 Samuel', 10, 24, 'media/37.png'), ('1 Reis', 11, 22, 'media/38.png'), ('2 Reis', 12, 25, 'media/39.png'),
+    ('1 Crônicas', 13, 29, 'media/40.png'), ('2 Crônicas', 14, 36, 'media/41.png'), ('Esdras', 15, 10, 'media/42.png'), ('Neemias', 16, 13, 'media/43.png'),
+    ('Ester', 17, 10, 'media/44.png'), ('Jó', 18, 42, 'media/45.png'), ('Salmos', 19, 150, 'media/46.png'), ('Provérbios', 20, 31, 'media/47.png'),
+    ('Eclesiastes', 21, 12, 'media/48.png'), ('Cantares', 22, 8, 'media/49.png'), ('Isaías', 23, 66, 'media/50.png'), ('Jeremias', 24, 52, 'media/51.png'),
+    ('Lamentações', 25, 5, 'media/52.png'), ('Ezequiel', 26, 48, 'media/53.png'), ('Daniel', 27, 12, 'media/54.png'), ('Oseias', 28, 14, 'media/55.png'),
+    ('Joel', 29, 3, 'media/56.png'), ('Amós', 30, 9, 'media/57.png'), ('Obadias', 31, 1, 'media/58.png'), ('Jonas', 32, 4, 'media/59.png'),
+    ('Miqueias', 33, 7, 'media/60.png'), ('Naum', 34, 3, 'media/61.png'), ('Habacuque', 35, 3, 'media/62.png'), ('Sofonias', 36, 3, 'media/63.png'),
+    ('Ageu', 37, 2, 'media/64.png'), ('Zacarias', 38, 14, 'media/65.png'), ('Malaquias', 39, 4, 'media/66.png'),
+    ('Mateus', 40, 28, 'media/1.png'), ('Marcos', 41, 16, 'media/2.png'), ('Lucas', 42, 24, 'media/3.png'), ('João', 43, 21, 'media/4.png'),
+    ('Atos', 44, 28, 'media/5.png'), ('Romanos', 45, 16, 'media/6.png'), ('1 Coríntios', 46, 16, 'media/7.png'), ('2 Coríntios', 47, 13, 'media/8.png'),
+    ('Gálatas', 48, 6, 'media/9.png'), ('Efésios', 49, 6, 'media/10.png'), ('Filipenses', 50, 4, 'media/11.png'), ('Colossenses', 51, 4, 'media/12.png'),
+    ('1 Tessalonicenses', 52, 5, 'media/13.png'), ('2 Tessalonicenses', 53, 3, 'media/14.png'), ('1 Timóteo', 54, 6, 'media/15.png'),
+    ('2 Timóteo', 55, 4, 'media/16.png'), ('Tito', 56, 3, 'media/17.png'), ('Filemom', 57, 1, 'media/18.png'), ('Hebreus', 58, 13, 'media/19.png'),
+    ('Tiago', 59, 5, 'media/20.png'), ('1 Pedro', 60, 5, 'media/21.png'), ('2 Pedro', 61, 3, 'media/22.png'), ('1 João', 62, 5, 'media/23.png'),
+    ('2 João', 63, 1, 'media/24.png'), ('3 João', 64, 1, 'media/25.png'), ('Judas', 65, 1, 'media/26.png'), ('Apocalipse', 66, 22, 'media/27.png')
+) AS v(nome, ordem, chapters, image_path)
 WHERE tb_livros.nome = v.nome;

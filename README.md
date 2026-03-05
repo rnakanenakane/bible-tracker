@@ -158,7 +158,6 @@ bible-tracker/
 │   └── utils.py            # Funções utilitárias e constantes
 ├── .pre-commit-config.yaml # Configuração dos hooks de pré-commit
 ├── app.py                  # Ponto de entrada da aplicação
-├── book_images.yaml        # Mapeamento de livros para imagens
 ├── Makefile                # Comandos de automação
 ├── pyproject.toml          # Dependências e configurações do projeto
 └── README.md               # Este arquivo

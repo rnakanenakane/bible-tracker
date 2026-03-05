@@ -429,3 +429,25 @@ class DatabaseRepository:
         except Exception as e:
             logger.warning(f"Não foi possível carregar o mapa de ordem dos livros: {e}")
         return {}
+
+    @st.cache_data(ttl=3600)
+    def get_book_images_map(_self) -> dict[str, str]:
+        """Cria um mapa de nome do livro para o caminho da sua imagem a partir do banco de dados.
+
+        Returns:
+            Um dicionário mapeando o nome de cada livro para o caminho da imagem.
+        """
+        try:
+            response = _self._client.table("tb_livros").select("nome, image_path").execute()
+            if response.data:
+                return {
+                    item["nome"]: item["image_path"]
+                    for item in response.data
+                    if isinstance(item, dict)
+                    and "nome" in item
+                    and "image_path" in item
+                    and item["image_path"] is not None
+                }
+        except Exception as e:
+            logger.warning(f"Não foi possível carregar o mapa de imagens dos livros: {e}")
+        return {}

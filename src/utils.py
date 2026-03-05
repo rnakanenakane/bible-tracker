@@ -1,7 +1,3 @@
-import streamlit as st
-import yaml
-
-
 def expandir_capitulos(str_caps: str) -> list[int]:
     """Expande uma string de capítulos (ex: '1-3' ou '5') para uma lista de inteiros.
 
@@ -38,34 +34,3 @@ def expandir_capitulos(str_caps: str) -> list[int]:
             return [int(str_caps)]
         except (ValueError, TypeError):
             return []
-
-
-@st.cache_data
-def load_book_images_map(path: str = "book_images.yaml") -> dict[str, str]:
-    """Carrega o mapeamento de nomes de livros para caminhos de imagem de um arquivo YAML.
-
-    Este método lê um arquivo YAML que associa o nome canônico de um livro da Bíblia
-    ao caminho do arquivo de imagem correspondente. Ele é cacheado pelo Streamlit
-    para evitar leituras repetidas do disco.
-
-    Args:
-        path: O caminho para o arquivo YAML contendo o mapeamento.
-
-    Returns:
-        Um dicionário onde as chaves são os nomes dos livros (str) e os valores
-        são os caminhos das imagens (str). Retorna um dicionário vazio se o
-        arquivo não for encontrado ou se houver um erro de processamento.
-    """
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = yaml.safe_load(f)
-            if not isinstance(data, dict):
-                st.warning(f"Arquivo '{path}' não contém um mapeamento válido (dicionário).")
-                return {}
-            return data
-    except FileNotFoundError:
-        # Não é um erro, apenas um modo de operação sem imagens.
-        return {}
-    except Exception as e:
-        st.error(f"Erro ao carregar ou processar o arquivo '{path}': {e}")
-        return {}
