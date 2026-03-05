@@ -174,7 +174,7 @@ def _encontrar_proxima_data_nao_lida(df_plano: pd.DataFrame, leituras_usuario: l
     return datetime.now(FUSO_BR)
 
 
-def render_reading_page(user: Usuario, repo: DatabaseRepository, plans: dict[str, pd.DataFrame]):
+def render_reading_page(user: Usuario, repo: DatabaseRepository, plan_names: list[str]):
     """Renderiza a página principal 'Minha Leitura'.
 
     Esta página é o coração da aplicação, permitindo ao usuário interagir com
@@ -186,7 +186,7 @@ def render_reading_page(user: Usuario, repo: DatabaseRepository, plans: dict[str
     Args:
         user: O usuário logado.
         repo: A instância do repositório de banco de dados para salvar e carregar dados.
-        plans: Um dicionário com todos os planos de leitura estruturados.
+        plan_names: Uma lista com os nomes de todos os planos de leitura disponíveis.
     """
     # Exibe a mensagem de comemoração se um livro foi recém-concluído.
     # A flag é definida no clique do botão e lida aqui após o rerun.
@@ -201,28 +201,32 @@ def render_reading_page(user: Usuario, repo: DatabaseRepository, plans: dict[str
 
     st.header("Meu Plano de Leitura")
 
-    if not plans:
+    if not plan_names:
         st.warning("Nenhum plano de leitura encontrado.")
         st.stop()
 
     # Define o plano padrão para o usuário (último ativo)
     if "user_check_plano" not in st.session_state or st.session_state.user_check_plano != user.id:
         ultimo_plano = repo.get_last_active_plan_name(user)
-        if ultimo_plano and ultimo_plano in plans:
+        if ultimo_plano and ultimo_plano in plan_names:
             st.session_state["plano_selecionado_widget"] = ultimo_plano
         st.session_state["user_check_plano"] = user.id
 
-    lista_planos_keys = sorted(list(plans.keys()))
     default_index = 0
     if (
         "plano_selecionado_widget" in st.session_state
-        and st.session_state.plano_selecionado_widget in lista_planos_keys
+        and st.session_state.plano_selecionado_widget in plan_names
     ):
-        default_index = lista_planos_keys.index(st.session_state.plano_selecionado_widget)
+        default_index = plan_names.index(st.session_state.plano_selecionado_widget)
 
-    plano_nome = st.selectbox("📅 Escolha o Plano", lista_planos_keys, index=default_index)
+    plano_nome = st.selectbox("📅 Escolha o Plano", plan_names, index=default_index)
     st.session_state.plano_selecionado_widget = plano_nome
-    df_plano = plans[plano_nome]
+
+    # Carrega a estrutura do plano selecionado. O cache otimiza chamadas repetidas.
+    df_plano = repo.get_plan_structure_by_name(plano_nome)
+    if df_plano is None or df_plano.empty:
+        st.error(f"Não foi possível carregar a estrutura do plano '{plano_nome}'.")
+        st.stop()
 
     if plano_nome != st.session_state.get("plano_anterior"):
         plano_id = df_plano["plano_id"].iloc[0] if not df_plano.empty else None

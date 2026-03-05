@@ -71,58 +71,75 @@ class DatabaseRepository:
         return None
 
     @st.cache_data(ttl=300)
-    def get_all_plans_structured(_self) -> dict[str, pd.DataFrame]:
-        """Carrega e estrutura todos os planos de leitura do banco de dados.
+    def get_all_plan_names(_self) -> list[str]:
+        """Busca os nomes de todos os planos de leitura disponíveis, ordenados alfabeticamente.
 
-        Este método busca todas as entradas da tabela `tb_plano_entradas`, processa
-        os dados e os agrupa em um dicionário. Cada chave do dicionário é o nome
-        de um plano, e o valor é um DataFrame do pandas contendo a estrutura
-        completa daquele plano, com colunas como 'data', 'livro', 'capitulos',
-        'livro_id', e 'qtd_capitulos'.
+        Returns:
+            Uma lista com os nomes dos planos.
+        """
+        try:
+            response = _self._client.table("tb_planos").select("nome").order("nome").execute()
+            if response.data:
+                return [
+                    item["nome"]
+                    for item in response.data
+                    if isinstance(item, dict) and "nome" in item and isinstance(item["nome"], str)
+                ]
+        except Exception as e:
+            logger.error(f"Erro ao carregar nomes dos planos: {e}", exc_info=True)
+            st.error("Não foi possível carregar a lista de planos.")
+        return []
+
+    @st.cache_data(ttl=300)
+    def get_plan_structure_by_name(_self, plan_name: str) -> Optional[pd.DataFrame]:
+        """Carrega e estrutura um plano de leitura específico a partir do seu nome.
+
+        Este método busca as entradas de um único plano, processa os dados e retorna
+        um DataFrame do pandas contendo a estrutura completa daquele plano.
 
         O método é cacheado pelo Streamlit para otimizar o desempenho, evitando
         consultas repetidas ao banco de dados.
 
+        Args:
+            plan_name: O nome do plano a ser carregado.
+
         Returns:
-            Um dicionário de DataFrames, onde cada DataFrame representa um plano de leitura.
-            Retorna um dicionário vazio se nenhum plano for encontrado ou em caso de erro.
+            Um DataFrame com a estrutura do plano, ou None se o plano não for encontrado
+            ou em caso de erro.
         """
         try:
             response = (
                 _self._client.table("tb_plano_entradas")
-                .select("data_leitura, capitulos, plano:tb_planos(id, nome), livro:tb_livros(id, nome)")
+                .select(
+                    "data_leitura, capitulos, plano:tb_planos!inner(id, nome), livro:tb_livros(id, nome)"
+                )
+                .eq("plano.nome", plan_name)
                 .execute()
             )
 
-            df_completo = pd.DataFrame(response.data)
-            if df_completo.empty:
-                return {}
+            df_plano = pd.DataFrame(response.data)
+            if df_plano.empty:
+                return None
 
-            df_completo["nome_plano"] = df_completo["plano"].apply(lambda p: p["nome"] if p else None)
-            df_completo["plano_id"] = df_completo["plano"].apply(lambda p: p["id"] if p else None)
-            # Correção: Extrair o ID ANTES de sobrescrever a coluna 'livro' com o nome.
-            df_completo["livro_id"] = df_completo["livro"].apply(
+            df_plano["nome_plano"] = df_plano["plano"].apply(lambda p: p["nome"] if p else None)
+            df_plano["plano_id"] = df_plano["plano"].apply(lambda p: p["id"] if p else None)
+            df_plano["livro_id"] = df_plano["livro"].apply(
                 lambda livro_obj: livro_obj["id"] if livro_obj else None
             )
-            df_completo["livro"] = df_completo["livro"].apply(
+            df_plano["livro"] = df_plano["livro"].apply(
                 lambda livro_obj: livro_obj["nome"] if livro_obj else None
             )
-            df_completo = df_completo.rename(columns={"data_leitura": "data"})
-            df_completo["data"] = pd.to_datetime(df_completo["data"])
+            df_plano = df_plano.rename(columns={"data_leitura": "data"})
+            df_plano["data"] = pd.to_datetime(df_plano["data"])
 
-            todos_planos = {}
-            for nome in df_completo["nome_plano"].unique():
-                df_filtrado = df_completo[df_completo["nome_plano"] == nome].copy()
-                df_filtrado = df_filtrado.sort_values(by="data")
-                df_filtrado["qtd_capitulos"] = df_filtrado["capitulos"].apply(
-                    lambda x: len(expandir_capitulos(x))
-                )
-                todos_planos[nome] = df_filtrado
-            return todos_planos
+            df_plano = df_plano.sort_values(by="data")
+            df_plano["qtd_capitulos"] = df_plano["capitulos"].apply(lambda x: len(expandir_capitulos(x)))
+            return df_plano
+
         except Exception as e:
-            logger.error(f"Erro ao carregar planos do banco de dados: {e}", exc_info=True)
-            st.error(f"Erro ao carregar planos do banco de dados: {e}")
-            return {}
+            logger.error(f"Erro ao carregar o plano '{plan_name}': {e}", exc_info=True)
+            st.error(f"Erro ao carregar o plano '{plan_name}'.")
+            return None
 
     @st.cache_data(ttl=60)
     def get_user_readings(_self, user: Usuario, plan_id: int) -> list[Leitura]:

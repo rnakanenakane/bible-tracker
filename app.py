@@ -52,12 +52,11 @@ def main():
                 del st.session_state[key]
             st.rerun()
 
-        # Carrega dados necessários para as páginas
-        # Usando o método cacheado do repositório
-        all_plans = repo.get_all_plans_structured()
+        # Carrega nomes dos planos para o menu de seleção
+        plan_names = repo.get_all_plan_names()
 
         if page == "Minha Leitura":
-            render_reading_page(current_user, repo, all_plans)
+            render_reading_page(current_user, repo, plan_names)
         elif page == "Progresso Geral":
             render_dashboard_page(repo)
         elif page == "Awards":
