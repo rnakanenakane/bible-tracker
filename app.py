@@ -59,7 +59,7 @@ def main():
         if page == "Minha Leitura":
             render_reading_page(current_user, repo, all_plans)
         elif page == "Progresso Geral":
-            render_dashboard_page(repo, all_plans)
+            render_dashboard_page(repo)
         elif page == "Awards":
             render_awards_page(current_user, repo)
         elif page == "Dúvidas da Comunidade":

@@ -375,90 +375,31 @@ def render_awards_page(user: Usuario, repo: DatabaseRepository):
         st.markdown("</div>", unsafe_allow_html=True)  # Fecha a div personalizada
 
 
-def _calculate_dashboard_metrics(
-    df_registros: pd.DataFrame, plans: dict[str, pd.DataFrame]
-) -> tuple[Optional[dict], Optional[pd.DataFrame]]:
-    """Calcula as métricas de progresso para o dashboard da comunidade.
-
-    Processa um DataFrame de registros de leitura para gerar estatísticas agregadas
-    (total de leitores, capítulos lidos, etc.) e um DataFrame detalhado com o
-    progresso de cada usuário em cada plano.
-
-    Args:
-        df_registros: DataFrame com todos os registros de leitura.
-        plans: Dicionário com os DataFrames de cada plano para cálculo das metas.
-
-    Returns:
-        Uma tupla contendo:
-        - Um dicionário com as métricas agregadas.
-        - Um DataFrame detalhado com o progresso de cada usuário.
-        Retorna (None, None) se não for possível calcular as métricas.
-    """
-    if df_registros is None or df_registros.empty:
-        return None, None
-
-    dados_consolidados = []
-    hoje_date = datetime.now(FUSO_BR).date()
-    grupos = df_registros.groupby(["Usuario", "Plano"])
-
-    for (usuario, plano_nome), grupo in grupos:
-        if plano_nome not in plans:
-            continue
-
-        df_plano = plans[plano_nome]
-        caps_lidos = len(grupo)
-        meta_ate_hoje = df_plano[df_plano["data"].dt.date <= hoje_date]["qtd_capitulos"].sum()
-        total_do_plano = df_plano["qtd_capitulos"].sum()
-
-        dados_consolidados.append(
-            {
-                "Usuario": usuario,
-                "Plano": plano_nome,
-                "Lidos": caps_lidos,
-                "Meta_Hoje": meta_ate_hoje,
-                "Total_Plano": total_do_plano,
-                "Status": "Em dia" if caps_lidos >= meta_ate_hoje else "Atrasado",
-                "Pct_Lido": (caps_lidos / total_do_plano) if total_do_plano > 0 else 0,
-                "Pct_Meta": (meta_ate_hoje / total_do_plano) if total_do_plano > 0 else 0,
-            }
-        )
-
-    if not dados_consolidados:
-        return None, None
-
-    df_dash = pd.DataFrame(dados_consolidados)
-    metricas = {
-        "total_leitores": df_dash["Usuario"].nunique(),
-        "total_lidos": df_registros.shape[0],
-        "em_dia": df_dash[df_dash["Status"] == "Em dia"].shape[0],
-        "atrasados": df_dash[df_dash["Status"] == "Atrasado"].shape[0],
-    }
-    return metricas, df_dash
-
-
-def render_dashboard_page(repo: DatabaseRepository, plans: dict[str, pd.DataFrame]):
+def render_dashboard_page(repo: DatabaseRepository):
     """Renderiza a página 'Progresso Geral' (Dashboard da Comunidade).
 
     Exibe métricas chave sobre o engajamento da comunidade e gráficos de barras
     que mostram o progresso de cada participante em seus respectivos planos de leitura.
+    Os dados são carregados de uma view pré-calculada no banco de dados para otimizar
+    o desempenho.
 
     Args:
         repo: A instância do repositório de banco de dados.
-        plans: Um dicionário com todos os planos de leitura estruturados.
     """
     st.markdown("### 🏆 Dashboard da Comunidade")
 
-    df_registros = repo.get_all_readings_for_dashboard()
-    if df_registros.empty:
+    df_dash = repo.get_dashboard_progress()
+    if df_dash.empty:
         st.info("Ainda não há registros de leitura para exibir os gráficos de progresso.")
         return
 
-    # Calcula e exibe as métricas e gráficos de progresso
-    metricas, df_dash = _calculate_dashboard_metrics(df_registros, plans)
-
-    if not metricas or df_dash is None:
-        st.info("Não foi possível calcular as métricas de progresso.")
-        return
+    # Calcula as métricas agregadas a partir dos dados pré-processados da view
+    metricas = {
+        "total_leitores": df_dash["Usuario"].nunique(),
+        "total_lidos": int(df_dash["Lidos"].sum()),
+        "em_dia": df_dash[df_dash["Status"] == "Em dia"].shape[0],
+        "atrasados": df_dash[df_dash["Status"] == "Atrasado"].shape[0],
+    }
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("👥 Leitores", metricas["total_leitores"])
@@ -466,6 +407,10 @@ def render_dashboard_page(repo: DatabaseRepository, plans: dict[str, pd.DataFram
     c3.metric("🎯 Em Dia", metricas["em_dia"])
     c4.metric("⚠️ Atrasados", metricas["atrasados"])
     st.markdown("<br>", unsafe_allow_html=True)
+
+    # Calcula as porcentagens para os gráficos
+    df_dash["Pct_Lido"] = (df_dash["Lidos"] / df_dash["Total_Plano"]).fillna(0)
+    df_dash["Pct_Meta"] = (df_dash["Meta_Hoje"] / df_dash["Total_Plano"]).fillna(0)
 
     for plano in sorted(df_dash["Plano"].unique()):
         with st.container():

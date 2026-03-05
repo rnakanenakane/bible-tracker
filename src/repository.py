@@ -359,31 +359,21 @@ class DatabaseRepository:
             st.warning(f"Não foi possível carregar os selos de conclusão: {e}")
             return {}
 
-    def get_all_readings_for_dashboard(self) -> pd.DataFrame:
-        """Busca todos os registros de leitura para o dashboard de progresso geral.
+    def get_dashboard_progress(self) -> pd.DataFrame:
+        """Busca os dados de progresso consolidados da view do dashboard.
 
-        Retorna um DataFrame contendo o nome do usuário e o plano para cada
-        capítulo lido, que será usado para calcular as métricas do dashboard.
+        A view 'vw_dashboard_progresso' já contém os cálculos de capítulos lidos,
+        metas e status para cada usuário em cada plano.
 
         Returns:
-            Um DataFrame do pandas com as colunas 'Usuario' e 'Plano'.
+            Um DataFrame do pandas com os dados prontos para serem exibidos.
         """
         try:
-            response = (
-                self._client.table("tb_leituras")
-                .select("usuario:tb_usuarios(nome), plano:tb_planos(nome)")
-                .execute()
-            )
-            df = pd.DataFrame(response.data)
-            if df.empty:
-                return df
-
-            df["Usuario"] = df["usuario"].apply(lambda x: x["nome"] if x else None)
-            df["Plano"] = df["plano"].apply(lambda x: x["nome"] if x else None)
-            return df[["Usuario", "Plano"]]
+            response = self._client.from_("vw_dashboard_progresso").select("*").execute()
+            return pd.DataFrame(response.data)
         except Exception as e:
-            logger.warning(f"Não foi possível carregar os registros para o dashboard: {e}")
-            st.warning(f"Não foi possível carregar os registros para o dashboard: {e}")
+            logger.error(f"Erro ao carregar dados do dashboard da view: {e}", exc_info=True)
+            st.error(f"Erro ao carregar dados do dashboard: {e}")
             return pd.DataFrame()
 
     @st.cache_data(ttl=3600)

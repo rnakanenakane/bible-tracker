@@ -240,3 +240,47 @@ FROM (VALUES
     ('2 João', 63, 1, 'media/24.png'), ('3 João', 64, 1, 'media/25.png'), ('Judas', 65, 1, 'media/26.png'), ('Apocalipse', 66, 22, 'media/27.png')
 ) AS v(nome, ordem, chapters, image_path)
 WHERE tb_livros.nome = v.nome;
+
+CREATE OR REPLACE VIEW public.vw_dashboard_progresso AS
+WITH
+  plan_totals AS (
+    SELECT
+      p.id AS plano_id,
+      p.nome AS plano_nome,
+      SUM((SELECT count(*) FROM public.expand_capitulos(pe.capitulos)))::integer AS total_do_plano
+    FROM public.tb_planos p
+    JOIN public.tb_plano_entradas pe ON p.id = pe.plano_id
+    GROUP BY p.id
+  ),
+  plan_targets_today AS (
+    SELECT
+      pe.plano_id,
+      SUM((SELECT count(*) FROM public.expand_capitulos(pe.capitulos)))::integer AS meta_hoje
+    FROM public.tb_plano_entradas pe
+    WHERE pe.data_leitura <= (NOW() AT TIME ZONE 'America/Sao_Paulo')
+    GROUP BY pe.plano_id
+  ),
+  user_readings AS (
+    SELECT
+      l.usuario_id,
+      l.plano_id,
+      count(*)::integer AS lidos
+    FROM public.tb_leituras l
+    GROUP BY l.usuario_id, l.plano_id
+  )
+SELECT
+  u.nome AS "Usuario",
+  pt.plano_nome AS "Plano",
+  COALESCE(ur.lidos, 0) AS "Lidos",
+  COALESCE(ptt.meta_hoje, 0) AS "Meta_Hoje",
+  pt.total_do_plano AS "Total_Plano",
+  CASE
+    WHEN COALESCE(ur.lidos, 0) >= COALESCE(ptt.meta_hoje, 0) THEN 'Em dia'::text
+    ELSE 'Atrasado'::text
+  END AS "Status"
+FROM user_readings ur
+JOIN public.tb_usuarios u ON ur.usuario_id = u.id
+JOIN plan_totals pt ON ur.plano_id = pt.plano_id
+LEFT JOIN plan_targets_today ptt ON ur.plano_id = ptt.plano_id;
+
+COMMENT ON VIEW public.vw_dashboard_progresso IS 'Visão consolidada para o dashboard de progresso, calculando capítulos lidos, metas e status para cada usuário em cada plano.';
